@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Plus, User, Calendar, Users } from "lucide-react-native";
+import { Plus, User, Calendar, Users, UserPlus } from "lucide-react-native";
 import EventCard from "./EventCard";
 import { getAllEvents, getEventsByUserId, getAuthState } from "../services/eventService";
 import type { Event } from "../services/eventService";
@@ -140,6 +140,10 @@ export default function EventList({
     }
   };
 
+  const handleJoinEvent = () => {
+    router.push("/join");
+  };
+
   // Handle id/_id inconsistency in event data
   const renderEventCard = ({ item }: { item: Event }) => {
     if (!item) {
@@ -213,6 +217,12 @@ export default function EventList({
               style={styles.headerButton}
             >
               <User size={20} color="#9333ea" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleJoinEvent}
+              style={styles.headerButton}
+            >
+              <UserPlus size={20} color="#9333ea" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleCreateEvent}
