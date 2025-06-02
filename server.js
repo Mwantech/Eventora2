@@ -13,6 +13,7 @@ dotenv.config();
 const authRoutes = require('./routes/authRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 // Initialize app
 const app = express();
@@ -40,7 +41,7 @@ const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:8081',
   'http://192.168.18.2:8081',
   'http://localhost:8081',
-  'http://127.0.0.1:8081'
+  'http://localhost:5173'
 ];
 
 const corsOptions = {
@@ -65,7 +66,8 @@ const corsOptions = {
     'Accept',
     'Authorization',
     'Cache-Control',
-    'Pragma'
+    'Pragma',
+    'x-api-key'  // Add this line to fix the CORS error
   ],
   exposedHeaders: ['Authorization'],
   maxAge: 86400 // 24 hours
@@ -81,7 +83,7 @@ app.use((req, res, next) => {
   }
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, x-api-key'); // Add x-api-key here too
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -99,8 +101,8 @@ if (process.env.NODE_ENV === 'development') {
 // Mount routers
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api', mediaRoutes);
-
 
 // Test endpoint to verify server is running
 app.get('/api/status', (req, res) => {
