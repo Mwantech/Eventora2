@@ -32,6 +32,11 @@ const UserSchema = new mongoose.Schema({
       return `https://api.dicebear.com/7.x/avataaars/svg?seed=${this.name.replace(/ /g, "")}`;
     }
   },
+  // ADD: Field to store Cloudinary public_id for profile images
+  profileImagePublicId: {
+    type: String,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -46,6 +51,15 @@ UserSchema.pre('save', async function(next) {
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// UPDATED: Handle profileImage default value correctly
+UserSchema.pre('save', function(next) {
+  // Only set default profileImage if it's not already set and this is a new document
+  if (this.isNew && !this.profileImage) {
+    this.profileImage = `https://api.dicebear.com/7.x/avataaars/svg?seed=${this.name.replace(/ /g, "")}`;
+  }
   next();
 });
 

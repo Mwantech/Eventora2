@@ -6,23 +6,15 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+// Import Cloudinary utilities
+const { 
+  uploadProfileImage: uploadToCloudinary, 
+  deleteFromCloudinary,
+  handleCloudinaryError 
+} = require('../config/cloudinary');
 
-// Configure multer for profile image uploads
-const profileStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = 'uploads/profiles';
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    // Generate unique filename: userId_timestamp.extension
-    const uniqueName = `${req.user.id}_${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
+// Configure multer for memory storage (since we're using Cloudinary)
+const profileStorage = multer.memoryStorage();
 
 const profileUpload = multer({
   storage: profileStorage,
@@ -79,7 +71,7 @@ exports.getUserStats = async (req, res) => {
   }
 };
 
-// @desc    Upload profile image
+// @desc    Upload profile image to Cloudinary
 // @route   POST /api/auth/upload-profile-image
 // @access  Private
 exports.uploadProfileImage = (req, res) => {
@@ -107,18 +99,39 @@ exports.uploadProfileImage = (req, res) => {
     }
 
     try {
-      const profileImageUrl = `/uploads/profiles/${req.file.filename}`;
+      console.log('Uploading profile image to Cloudinary for user:', req.user.id);
       
-      // Update user's profile image in database
+      // Get current user to check for existing profile image
+      const currentUser = await User.findById(req.user.id);
+      
+      // Upload new image to Cloudinary
+      const cloudinaryResult = await uploadToCloudinary(req.file.buffer, req.user.id);
+      
+      console.log('Cloudinary upload successful:', {
+        public_id: cloudinaryResult.public_id,
+        secure_url: cloudinaryResult.secure_url
+      });
+
+      // If user had a previous profile image, delete it from Cloudinary
+      if (currentUser.profileImage && currentUser.profileImagePublicId) {
+        console.log('Deleting old profile image:', currentUser.profileImagePublicId);
+        const deleteResult = await deleteFromCloudinary(currentUser.profileImagePublicId, 'image');
+        console.log('Old image deletion result:', deleteResult);
+      }
+
+      // Update user's profile image in database with Cloudinary URL and public_id
       const user = await User.findByIdAndUpdate(
         req.user.id,
-        { profileImage: profileImageUrl },
+        { 
+          profileImage: cloudinaryResult.secure_url,
+          profileImagePublicId: cloudinaryResult.public_id
+        },
         { new: true, runValidators: true }
       );
 
       res.status(StatusCodes.OK).json({
         success: true,
-        profileImageUrl,
+        profileImageUrl: cloudinaryResult.secure_url,
         message: 'Profile image uploaded successfully',
         user: {
           id: user._id,
@@ -128,17 +141,16 @@ exports.uploadProfileImage = (req, res) => {
         }
       });
     } catch (error) {
-      // If database update fails, delete the uploaded file
-      if (req.file && req.file.path) {
-        fs.unlink(req.file.path, (unlinkErr) => {
-          if (unlinkErr) console.error('Error deleting file:', unlinkErr);
-        });
+      console.error('Error uploading profile image to Cloudinary:', error);
+      
+      // Handle Cloudinary-specific errors
+      if (error.http_code || error.message) {
+        return handleCloudinaryError(error, res, 'Profile image upload failed');
       }
 
-      console.error('Error updating profile image:', error);
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
         success: false,
-        message: 'Failed to update profile image'
+        message: 'Failed to upload profile image'
       });
     }
   });
@@ -344,6 +356,64 @@ exports.updateProfile = async (req, res) => {
     res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
       message: error.message || 'Failed to update profile'
+    });
+  }
+};
+
+// @desc    Delete profile image
+// @route   DELETE /api/auth/profile-image
+// @access  Private
+exports.deleteProfileImage = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // If user has a profile image, delete it from Cloudinary
+    if (user.profileImagePublicId) {
+      console.log('Deleting profile image from Cloudinary:', user.profileImagePublicId);
+      const deleteResult = await deleteFromCloudinary(user.profileImagePublicId, 'image');
+      console.log('Profile image deletion result:', deleteResult);
+    }
+
+    // Remove profile image from user record
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { 
+        $unset: { 
+          profileImage: 1, 
+          profileImagePublicId: 1 
+        } 
+      },
+      { new: true }
+    );
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'Profile image deleted successfully',
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        profileImage: updatedUser.profileImage
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting profile image:', error);
+    
+    // Handle Cloudinary-specific errors
+    if (error.http_code || error.message) {
+      return handleCloudinaryError(error, res, 'Profile image deletion failed');
+    }
+
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to delete profile image'
     });
   }
 };
