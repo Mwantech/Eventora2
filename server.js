@@ -74,12 +74,24 @@ app.use(cookieParser());
 // Enhanced CORS configuration for production
 const corsOptions = {
   origin: function (origin, callback) {
-    // In production, we'll be more restrictive
+    // Development URLs that should always be allowed
+    const developmentOrigins = [
+      process.env.CLIENT_URL || 'http://localhost:8081',
+      'http://192.168.245.59:8081',
+      'http://localhost:8081',
+      'http://localhost:5173'
+    ];
+    
+    // Allow requests with no origin (React Native apps, mobile apps, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Always allow development URLs regardless of environment
+    if (developmentOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // In production, also check for additional allowed domains
     if (process.env.NODE_ENV === 'production') {
-      // Allow requests with no origin (React Native apps)
-      if (!origin) return callback(null, true);
-      
-      // Only allow specific domains in production
       const allowedDomains = process.env.ALLOWED_DOMAINS ? 
         process.env.ALLOWED_DOMAINS.split(',') : [];
       
@@ -90,20 +102,9 @@ const corsOptions = {
         return callback(new Error('Not allowed by CORS'));
       }
     } else {
-      // Development - more permissive
-      const allowedOrigins = [
-        process.env.CLIENT_URL || 'http://localhost:8081',
-        'http://192.168.245.59:8081',
-        'http://localhost:8081',
-        'http://localhost:5173'
-      ];
-      
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        console.log('CORS blocked origin:', origin);
-        return callback(new Error('Not allowed by CORS'));
-      }
+      // Development - allow other origins as well
+      console.log('CORS blocked origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
