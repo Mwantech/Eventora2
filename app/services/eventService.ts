@@ -22,31 +22,32 @@ export interface Event {
   participantDetails?: any[]; // Add this to store participant information
 }
 
-// FIXED: Use proper API base URL
-const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.161.217:5500';
-
-// FIXED: Helper function to convert relative image URLs to absolute URLs
-const getFullImageUrl = (imagePath: string | undefined): string | undefined => {
-  if (!imagePath) return undefined;
+// Helper function to properly handle image URLs
+const processImageUrl = (imageUrl: string | undefined): string | undefined => {
+  if (!imageUrl) return undefined;
   
-  // If it's already a full URL, return as is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
+  // If it's already a full URL (http/https or Cloudinary URL), return as is
+  if (imageUrl.startsWith('http://') || 
+      imageUrl.startsWith('https://') || 
+      imageUrl.includes('cloudinary.com') ||
+      imageUrl.includes('res.cloudinary.com')) {
+    return imageUrl;
   }
   
-  // FIXED: Handle relative paths properly
-  // If it starts with /uploads, just prepend base URL
-  if (imagePath.startsWith('/uploads')) {
-    return `${API_BASE_URL}${imagePath}`;
+  // For backward compatibility with local uploads, construct full URL
+  const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.161.217:5500';
+  
+  // Handle relative paths
+  if (imageUrl.startsWith('/uploads')) {
+    return `${API_BASE_URL}${imageUrl}`;
   }
   
-  // If it starts with uploads (without /), prepend base URL with /
-  if (imagePath.startsWith('uploads')) {
-    return `${API_BASE_URL}/${imagePath}`;
+  if (imageUrl.startsWith('uploads')) {
+    return `${API_BASE_URL}/${imageUrl}`;
   }
   
   // For any other relative path, add both / and base URL
-  const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  const cleanPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
   return `${API_BASE_URL}${cleanPath}`;
 };
 
@@ -68,33 +69,34 @@ export const getAuthState = async () => {
   }
 };
 
-// FIXED: Map MongoDB _id to id for frontend consistency and fix image URLs
+// Map MongoDB _id to id for frontend consistency and process image URLs
 const mapEventIds = (event: any): Event => {
   if (!event) return event;
   
   // If event has _id but no id, create an id property from _id
   const mappedEvent = event._id && !event.id ? { ...event, id: event._id } : event;
   
-  // FIXED: Fix image URLs with proper logging
+  // Process cover image URL
   if (mappedEvent.coverImage) {
     const originalUrl = mappedEvent.coverImage;
-    mappedEvent.coverImage = getFullImageUrl(mappedEvent.coverImage);
-    console.log(`Cover image URL mapping: ${originalUrl} -> ${mappedEvent.coverImage}`);
+    mappedEvent.coverImage = processImageUrl(mappedEvent.coverImage);
+    console.log(`Cover image URL: ${originalUrl} -> ${mappedEvent.coverImage}`);
   }
   
+  // Process creator profile image URL
   if (mappedEvent.creatorProfileImage) {
     const originalUrl = mappedEvent.creatorProfileImage;
-    mappedEvent.creatorProfileImage = getFullImageUrl(mappedEvent.creatorProfileImage);
-    console.log(`Creator profile image URL mapping: ${originalUrl} -> ${mappedEvent.creatorProfileImage}`);
+    mappedEvent.creatorProfileImage = processImageUrl(mappedEvent.creatorProfileImage);
+    console.log(`Creator profile image URL: ${originalUrl} -> ${mappedEvent.creatorProfileImage}`);
   }
   
-  // Fix participant profile images if they exist
+  // Process participant profile images if they exist
   if (mappedEvent.participantDetails && Array.isArray(mappedEvent.participantDetails)) {
     mappedEvent.participantDetails = mappedEvent.participantDetails.map((participant: any) => ({
       ...participant,
       userId: participant.userId ? {
         ...participant.userId,
-        profileImage: getFullImageUrl(participant.userId.profileImage)
+        profileImage: processImageUrl(participant.userId.profileImage)
       } : participant.userId
     }));
   }
@@ -141,11 +143,10 @@ export const uploadEventImage = async (imageUri: string): Promise<string> => {
 
     console.log('Upload response:', response.data);
 
-    // FIXED: Return the full image URL
+    // Return the Cloudinary URL directly (it's already a full URL)
     const imageUrl = response.data.data.imageUrl;
-    const fullImageUrl = getFullImageUrl(imageUrl) || imageUrl;
-    console.log('Final image URL:', fullImageUrl);
-    return fullImageUrl;
+    console.log('Uploaded image URL:', imageUrl);
+    return imageUrl;
   } catch (error) {
     console.error('Error uploading event image:', error);
     throw error;
@@ -160,10 +161,10 @@ export const getAllEvents = async (): Promise<Event[]> => {
     
     console.log('Raw events data:', events);
     
-    // Map _id to id for all events and fix image URLs
+    // Map _id to id for all events and process image URLs
     const mappedEvents = Array.isArray(events) ? events.map(mapEventIds) : [];
     
-    console.log('Mapped events with image URLs:', mappedEvents);
+    console.log('Mapped events with processed image URLs:', mappedEvents);
     
     return mappedEvents;
   } catch (error) {
@@ -191,10 +192,10 @@ export const getEventsByUserId = async (
     
     console.log('Raw user events data:', events);
     
-    // Map _id to id for all events and fix image URLs
+    // Map _id to id for all events and process image URLs
     const mappedEvents = Array.isArray(events) ? events.map(mapEventIds) : [];
     
-    console.log('Mapped user events with image URLs:', mappedEvents);
+    console.log('Mapped user events with processed image URLs:', mappedEvents);
     
     return mappedEvents;
   } catch (error) {
@@ -217,10 +218,10 @@ export const getEventById = async (eventId: string): Promise<Event | null> => {
     
     console.log('Raw event data:', event);
     
-    // Map _id to id for the event and fix image URLs
+    // Map _id to id for the event and process image URLs
     const mappedEvent = event ? mapEventIds(event) : null;
     
-    console.log('Mapped event with image URLs:', mappedEvent);
+    console.log('Mapped event with processed image URLs:', mappedEvent);
     
     return mappedEvent;
   } catch (error) {
@@ -258,10 +259,10 @@ export const getEventByShareLink = async (eventId: string, token: string): Promi
     
     console.log('Raw shared event data:', event);
     
-    // Map _id to id for the event and fix image URLs
+    // Map _id to id for the event and process image URLs
     const mappedEvent = event ? mapEventIds(event) : null;
     
-    console.log('Mapped shared event with image URLs:', mappedEvent);
+    console.log('Mapped shared event with processed image URLs:', mappedEvent);
     
     return mappedEvent;
   } catch (error) {
@@ -281,10 +282,10 @@ export const createEvent = async (
     
     console.log('Created event response:', response.data);
     
-    // Map _id to id for the created event and fix image URLs
+    // Map _id to id for the created event and process image URLs
     const mappedEvent = mapEventIds(response.data.data);
     
-    console.log('Mapped created event with image URLs:', mappedEvent);
+    console.log('Mapped created event with processed image URLs:', mappedEvent);
     
     return mappedEvent;
   } catch (error) {
@@ -334,10 +335,10 @@ export const updateEvent = async (
     
     console.log('Updated event response:', response.data);
     
-    // Map _id to id for the updated event and fix image URLs
+    // Map _id to id for the updated event and process image URLs
     const mappedEvent = mapEventIds(response.data.data);
     
-    console.log('Mapped updated event with image URLs:', mappedEvent);
+    console.log('Mapped updated event with processed image URLs:', mappedEvent);
     
     return mappedEvent;
   } catch (error) {
@@ -387,6 +388,25 @@ export const leaveEvent = async (eventId: string): Promise<void> => {
     await apiClient.delete(`/events/${eventId}/leave`);
   } catch (error) {
     console.error('Error leaving event:', error);
+    throw error;
+  }
+};
+
+// Join event via share link
+export const joinEventViaShareLink = async (eventId: string, token: string): Promise<Event> => {
+  try {
+    if (!eventId || !token) {
+      throw new Error('Event ID and token are required for joining via share link');
+    }
+    
+    const response = await apiClient.post(`/events/share/${eventId}/${token}/join`);
+    
+    // Map _id to id for the event and process image URLs
+    const mappedEvent = mapEventIds(response.data.data.event);
+    
+    return mappedEvent;
+  } catch (error) {
+    console.error('Error joining event via share link:', error);
     throw error;
   }
 };
