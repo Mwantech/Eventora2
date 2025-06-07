@@ -4,33 +4,23 @@ const EventParticipant = require('../models/EventParticipant');
 const User = require('../models/User');
 const asyncHandler = require('../middleware/async');
 const ErrorResponse = require('../utils/errorResponse');
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
 const mongoose = require('mongoose');
+const {
+  uploadImage,
+  uploadVideo,
+  uploadEventMedia,
+  deleteFromCloudinary,
+  handleCloudinaryError
+} = require('../config/cloudinary');
 
 // Helper function to check if ID is valid MongoDB ObjectId
 const isValidObjectId = (id) => {
   return id && mongoose.Types.ObjectId.isValid(id);
 };
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function(req, file, cb) {
-    // Create uploads/media directory if it doesn't exist
-    const uploadDir = 'uploads/media';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: function(req, file, cb) {
-    // Generate unique filename: timestamp-original name
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const fileExt = path.extname(file.originalname);
-    cb(null, uniqueSuffix + fileExt);
-  }
-});
+// Configure multer for memory storage (we'll upload to Cloudinary)
+const storage = multer.memoryStorage();
 
 // File filter to validate media types
 const fileFilter = (req, file, cb) => {
@@ -42,12 +32,12 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Initialize multer upload
+// Initialize multer upload with memory storage
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB file size limit
+    fileSize: 50 * 1024 * 1024, // 50MB file size limit (increased for videos)
   }
 });
 
@@ -165,27 +155,52 @@ exports.uploadMedia = asyncHandler(async (req, res, next) => {
         }
       }
       
-      // Create media records for each file
+      // Upload files to Cloudinary and create media records
       const uploadPromises = req.files.map(async (file) => {
         // Determine media type based on mimetype
         const type = file.mimetype.startsWith('image/') ? 'image' : 'video';
         
-        // Create media record
-        const media = await Media.create({
-          eventId,
-          userId,
-          type,
-          filename: file.filename,
-          filepath: file.path,
-          caption: caption || '',
-          tags: parsedTags,
-          likes: 0
-        });
-        
-        return media;
+        try {
+          // Upload to Cloudinary based on type
+          let cloudinaryResult;
+          if (type === 'image') {
+            cloudinaryResult = await uploadEventMedia(
+              file.buffer,
+              eventId,
+              userId,
+              'image'
+            );
+          } else {
+            cloudinaryResult = await uploadEventMedia(
+              file.buffer,
+              eventId,
+              userId,
+              'video'
+            );
+          }
+          
+          // Create media record with Cloudinary data
+          const media = await Media.create({
+            eventId,
+            userId,
+            type,
+            filename: cloudinaryResult.public_id,
+            filepath: cloudinaryResult.secure_url,
+            cloudinaryPublicId: cloudinaryResult.public_id,
+            cloudinaryUrl: cloudinaryResult.secure_url,
+            caption: caption || '',
+            tags: parsedTags,
+            likes: 0
+          });
+          
+          return media;
+        } catch (uploadError) {
+          console.error('Error uploading to Cloudinary:', uploadError);
+          throw new ErrorResponse(`Failed to upload ${file.originalname}: ${uploadError.message}`, 500);
+        }
       });
       
-      // Wait for all media to be created
+      // Wait for all media to be uploaded and created
       const mediaRecords = await Promise.all(uploadPromises);
       
       // Populate uploader info for each media
@@ -199,13 +214,9 @@ exports.uploadMedia = asyncHandler(async (req, res, next) => {
         data: populatedMedia
       });
     } catch (error) {
-      // Clean up uploaded files if there was an error
-      if (req.files && req.files.length > 0) {
-        req.files.forEach(file => {
-          fs.unlink(file.path, (err) => {
-            if (err) console.error(`Error deleting file ${file.path}:`, err);
-          });
-        });
+      // If it's a Cloudinary error, use the specific error handler
+      if (error.name === 'Error' && error.http_code) {
+        return handleCloudinaryError(error, res, 'Failed to upload media');
       }
       next(error);
     }
@@ -422,15 +433,22 @@ exports.deleteMedia = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse(`User not authorized to delete this media`, 403));
   }
   
-  // Delete file from filesystem
-  const filePath = media.filepath;
-  try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+  // Delete from Cloudinary if we have a public ID
+  if (media.cloudinaryPublicId || media.filename) {
+    try {
+      const publicId = media.cloudinaryPublicId || media.filename;
+      const resourceType = media.type === 'video' ? 'video' : 'image';
+      
+      const deleteResult = await deleteFromCloudinary(publicId, resourceType);
+      
+      if (!deleteResult.success) {
+        console.warn(`Warning: Could not delete media from Cloudinary: ${deleteResult.error}`);
+        // Continue with database deletion even if Cloudinary deletion fails
+      }
+    } catch (err) {
+      console.error(`Error deleting media from Cloudinary:`, err);
+      // Continue with database deletion even if Cloudinary deletion fails
     }
-  } catch (err) {
-    console.error(`Error deleting file ${filePath}:`, err);
-    // Continue with database deletion even if file deletion fails
   }
   
   // Delete media record

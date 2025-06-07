@@ -7,33 +7,19 @@ const ErrorResponse = require('../utils/errorResponse');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const {
+  uploadEventMedia,
+  handleCloudinaryError,
+  deleteFromCloudinary
+} = require('../config/cloudinary');
 
 // Helper function to check if ID is valid MongoDB ObjectId
 const isValidObjectId = (id) => {
   return id && mongoose.Types.ObjectId.isValid(id);
 };
 
-// Configure multer for file upload
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, '../uploads/events');
-    
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const fileExtension = path.extname(file.originalname);
-    cb(null, 'event-' + uniqueSuffix + fileExtension);
-  }
-});
+// Configure multer for memory storage (for Cloudinary upload)
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   // Check if file is an image
@@ -52,7 +38,7 @@ const upload = multer({
   }
 });
 
-// @desc    Upload event image
+// @desc    Upload event image to Cloudinary
 // @route   POST /api/events/upload-image
 // @access  Private
 exports.uploadEventImage = [
@@ -62,16 +48,46 @@ exports.uploadEventImage = [
       return next(new ErrorResponse('Please upload an image file', 400));
     }
 
-    // Get the file path relative to the uploads directory
-    const imageUrl = `/uploads/events/${req.file.filename}`;
+    try {
+      // Create a temporary event ID for organizing uploads
+      // In a real scenario, you might want to pass the actual event ID
+      const tempEventId = `temp_${Date.now()}`;
+      
+      // Upload to Cloudinary
+      const uploadResult = await uploadEventMedia(
+        req.file.buffer,
+        tempEventId,
+        req.user.id,
+        'image',
+        {
+          // Additional options for event cover images
+          transformation: [
+            {
+              width: 800,
+              height: 600,
+              crop: 'fill',
+              quality: 'auto:good',
+              fetch_format: 'auto',
+            }
+          ]
+        }
+      );
 
-    res.status(200).json({
-      success: true,
-      data: {
-        imageUrl: imageUrl,
-        filename: req.file.filename
-      }
-    });
+      console.log('Cloudinary upload result:', uploadResult);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          imageUrl: uploadResult.secure_url,
+          publicId: uploadResult.public_id,
+          width: uploadResult.width,
+          height: uploadResult.height
+        }
+      });
+    } catch (error) {
+      console.error('Error uploading to Cloudinary:', error);
+      return handleCloudinaryError(error, res, 'Failed to upload event image');
+    }
   })
 ];
 
@@ -81,6 +97,14 @@ exports.uploadEventImage = [
 exports.createEvent = asyncHandler(async (req, res, next) => {
   // Add creator to request body
   req.body.creatorId = req.user.id;
+
+  // If coverImage is provided and it's a Cloudinary URL, keep it as is
+  // If it's a publicId, we might need to generate the full URL
+  if (req.body.coverImage && !req.body.coverImage.startsWith('http')) {
+    // Assume it's a public ID and generate the URL
+    const { generateOptimizedUrl } = require('../utils/cloudinary');
+    req.body.coverImage = generateOptimizedUrl(req.body.coverImage);
+  }
 
   // Create event
   const event = await Event.create(req.body);
@@ -320,6 +344,21 @@ exports.updateEvent = asyncHandler(async (req, res, next) => {
     }
   });
 
+  // Handle coverImage update - if it's a new Cloudinary URL or publicId
+  if (updateData.coverImage) {
+    // If it's not already a full URL, assume it's a public ID
+    if (!updateData.coverImage.startsWith('http')) {
+      const { generateOptimizedUrl } = require('../utils/cloudinary');
+      updateData.coverImage = generateOptimizedUrl(updateData.coverImage);
+    }
+    
+    // Optional: Delete old cover image from Cloudinary if it exists
+    // This requires storing the public_id in the database
+    // if (event.coverImagePublicId) {
+    //   await deleteFromCloudinary(event.coverImagePublicId, 'image');
+    // }
+  }
+
   // Additional validation for specific fields
   if (updateData.name && updateData.name.trim().length === 0) {
     return next(new ErrorResponse('Event name cannot be empty', 400));
@@ -391,6 +430,17 @@ exports.deleteEvent = asyncHandler(async (req, res, next) => {
   // Make sure user is event creator
   if (event.creatorId.toString() !== req.user.id) {
     return next(new ErrorResponse(`User ${req.user.id} is not authorized to delete this event`, 403));
+  }
+
+  // Optional: Clean up Cloudinary images associated with this event
+  try {
+    const { cleanupUnusedMedia } = require('../utils/cloudinary');
+    // Clean up the event folder in Cloudinary
+    await cleanupUnusedMedia(`events/${eventId}`);
+    console.log(`Cleaned up Cloudinary folder for event ${eventId}`);
+  } catch (cleanupError) {
+    console.error('Error cleaning up Cloudinary media:', cleanupError);
+    // Don't fail the deletion if cleanup fails
   }
 
   // Delete event and its participants
@@ -485,8 +535,6 @@ exports.leaveEvent = asyncHandler(async (req, res, next) => {
     data: { message: 'Successfully left the event' }
   });
 });
-
-
 
 // @desc    Generate a share link for an event
 // @route   POST /api/events/:id/share
