@@ -5,6 +5,9 @@ const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const jwt = require('jsonwebtoken');
 
 // Load env variables
 dotenv.config();
@@ -29,32 +32,78 @@ mongoose.connect(process.env.MONGO_URI || '', {
   process.exit(1);
 });
 
+// Security middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    success: false,
+    message: 'Too many requests from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to all requests
+app.use(limiter);
+
+// Stricter rate limiting for auth routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 auth requests per windowMs
+  message: {
+    success: false,
+    message: 'Too many authentication attempts, please try again later.'
+  }
+});
+
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
-// Enhanced CORS configuration
-const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:8081',
-  'http://192.168.245.59:8081',
-  'http://localhost:8081',
-  'http://localhost:5173'
-];
+// Removed API Key validation middleware
 
+// Enhanced CORS configuration for production
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, curl)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+    // In production, we'll be more restrictive
+    if (process.env.NODE_ENV === 'production') {
+      // Allow requests with no origin (React Native apps)
+      if (!origin) return callback(null, true);
+      
+      // Only allow specific domains in production
+      const allowedDomains = process.env.ALLOWED_DOMAINS ? 
+        process.env.ALLOWED_DOMAINS.split(',') : [];
+      
+      if (allowedDomains.some(domain => origin.includes(domain))) {
+        return callback(null, true);
+      } else {
+        console.log('CORS blocked origin:', origin);
+        return callback(new Error('Not allowed by CORS'));
+      }
     } else {
-      console.log('CORS blocked origin:', origin);
-      return callback(new Error('Not allowed by CORS'));
+      // Development - more permissive
+      const allowedOrigins = [
+        process.env.CLIENT_URL || 'http://localhost:8081',
+        'http://192.168.245.59:8081',
+        'http://localhost:8081',
+        'http://localhost:5173'
+      ];
+      
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.log('CORS blocked origin:', origin);
+        return callback(new Error('Not allowed by CORS'));
+      }
     }
   },
   credentials: true,
@@ -67,7 +116,7 @@ const corsOptions = {
     'Authorization',
     'Cache-Control',
     'Pragma',
-    'x-api-key'  // Add this line to fix the CORS error
+    'x-api-key' // Removed - keeping for backward compatibility
   ],
   exposedHeaders: ['Authorization'],
   maxAge: 86400 // 24 hours
@@ -75,15 +124,12 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Additional manual CORS headers for extra compatibility
+// Additional security headers
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin) || !origin) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, x-api-key'); // Add x-api-key here too
+  // Security headers
+  res.header('X-Content-Type-Options', 'nosniff');
+  res.header('X-Frame-Options', 'DENY');
+  res.header('X-XSS-Protection', '1; mode=block');
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -94,17 +140,58 @@ app.use((req, res, next) => {
   next();
 });
 
+// Request logging
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
 }
+
+// Removed app version validation middleware
+
+// Apply stricter rate limiting to auth routes
+app.use('/api/auth', authLimiter);
+
+// JWT validation middleware for protected routes
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'Access token required'
+    });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+    req.user = user;
+    next();
+  });
+};
 
 // Mount routers
 app.use('/api/auth', authRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api', mediaRoutes);
+app.use('/api/events', authenticateToken, eventRoutes);
+app.use('/api/analytics', authenticateToken, analyticsRoutes);
+app.use('/api', authenticateToken, mediaRoutes);
 
-// Test endpoint to verify server is running
+// Health check endpoint (no auth required)
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Server is running!',
+    timestamp: new Date()
+  });
+});
+
+// Public status endpoint
 app.get('/api/status', (req, res) => {
   res.json({
     success: true,
@@ -125,14 +212,32 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
   
+  // Don't leak error details in production
+  const message = process.env.NODE_ENV === 'production' ? 
+    'Internal server error' : err.message;
+  
   res.status(err.statusCode || 500).json({
     success: false,
-    message: err.message || 'Server Error'
+    message: message
   });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  process.exit(0);
 });
 
 // Start server
 const PORT = process.env.PORT || 5500;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'production'}`);
+});
 
 module.exports = app;
