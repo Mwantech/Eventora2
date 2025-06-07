@@ -8,6 +8,7 @@ export interface User {
   name: string;
   email: string;
   profileImage?: string;
+  isEmailVerified?: boolean;
 }
 
 // Authentication state
@@ -22,9 +23,11 @@ interface AuthState {
 const AuthContext = createContext<{
   state: AuthState;
   login: (email: string, password: string) => Promise<User>;
-  register: (name: string, email: string, password: string) => Promise<User>;
+  register: (name: string, email: string, password: string) => Promise<{ success: boolean; message: string; email: string }>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: Partial<{ name: string; profileImage: string }>) => Promise<User>;
+  verifyEmail: (email: string, code: string) => Promise<User>;
+  resendVerificationCode: (email: string) => Promise<{ success: boolean; message: string }>;
 }>({
   state: {
     user: null,
@@ -33,9 +36,11 @@ const AuthContext = createContext<{
     error: null
   },
   login: async () => ({ id: '', name: '', email: '' }),
-  register: async () => ({ id: '', name: '', email: '' }),
+  register: async () => ({ success: false, message: '', email: '' }),
   logout: async () => {},
-  updateUserProfile: async () => ({ id: '', name: '', email: '' })
+  updateUserProfile: async () => ({ id: '', name: '', email: '' }),
+  verifyEmail: async () => ({ id: '', name: '', email: '' }),
+  resendVerificationCode: async () => ({ success: false, message: '' })
 });
 
 // Export auth state functions for direct use if needed
@@ -184,7 +189,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return user;
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
+      let errorMessage = error.response?.data?.message || error.message || 'Login failed';
+      
+      // Check for email verification requirement
+      if (error.response?.data?.emailVerificationRequired) {
+        errorMessage = 'Please verify your email address before logging in';
+      }
       
       setState(prev => ({
         ...prev,
@@ -196,12 +206,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Register function
+  // Register function - now returns verification info instead of directly logging in
   const register = async (
     name: string,
     email: string,
     password: string
-  ): Promise<User> => {
+  ): Promise<{ success: boolean; message: string; email: string }> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
@@ -209,6 +219,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name,
         email,
         password
+      });
+      
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: null
+      }));
+      
+      return {
+        success: true,
+        message: response.data.message || 'Registration successful! Please check your email for verification.',
+        email: email
+      };
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Registration failed';
+      
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage
+      }));
+      
+      throw new Error(errorMessage);
+    }
+  };
+
+  // Email verification function
+  const verifyEmail = async (email: string, code: string): Promise<User> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const response = await apiClient.post('/auth/verify-email', {
+        email,
+        code
       });
       
       const { token, user } = response.data;
@@ -231,7 +275,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return user;
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Registration failed';
+      const errorMessage = error.response?.data?.message || error.message || 'Verification failed';
       
       setState(prev => ({
         ...prev,
@@ -240,6 +284,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
       
       throw new Error(errorMessage);
+    }
+  };
+
+  // Resend verification code function
+  const resendVerificationCode = async (email: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await apiClient.post('/auth/resend-verification', {
+        email
+      });
+      
+      return {
+        success: true,
+        message: response.data.message || 'Verification code sent successfully!'
+      };
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to resend verification code';
+      
+      return {
+        success: false,
+        message: errorMessage
+      };
     }
   };
 
@@ -312,7 +377,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ state, login, register, logout, updateUserProfile }}>
+    <AuthContext.Provider value={{ 
+      state, 
+      login, 
+      register, 
+      logout, 
+      updateUserProfile, 
+      verifyEmail, 
+      resendVerificationCode 
+    }}>
       {children}
     </AuthContext.Provider>
   );
