@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const UserSchema = new mongoose.Schema({
   name: {
@@ -36,6 +37,23 @@ const UserSchema = new mongoose.Schema({
   profileImagePublicId: {
     type: String,
     default: null
+  },
+  // ADD: Email verification fields
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationCode: {
+    type: String,
+    select: false // Don't return in queries by default
+  },
+  emailVerificationCodeExpires: {
+    type: Date,
+    select: false // Don't return in queries by default
+  },
+  emailVerificationCodeSentAt: {
+    type: Date,
+    select: false // Don't return in queries by default
   },
   createdAt: {
     type: Date,
@@ -75,6 +93,50 @@ UserSchema.methods.getSignedJwtToken = function() {
 // Match user entered password to hashed password in database
 UserSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Generate email verification code
+UserSchema.methods.generateEmailVerificationCode = function() {
+  // Generate 6-digit code
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  // Set verification code and expiration (10 minutes from now)
+  this.emailVerificationCode = verificationCode;
+  this.emailVerificationCodeExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  this.emailVerificationCodeSentAt = Date.now();
+  
+  return verificationCode;
+};
+
+// Check if verification code can be sent (10 minutes cooldown)
+UserSchema.methods.canSendVerificationCode = function() {
+  if (!this.emailVerificationCodeSentAt) {
+    return true;
+  }
+  
+  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+  return this.emailVerificationCodeSentAt < tenMinutesAgo;
+};
+
+// Verify email verification code
+UserSchema.methods.verifyEmailCode = function(code) {
+  if (!this.emailVerificationCode || !this.emailVerificationCodeExpires) {
+    return false;
+  }
+  
+  // Check if code has expired
+  if (Date.now() > this.emailVerificationCodeExpires) {
+    return false;
+  }
+  
+  // Check if code matches
+  return this.emailVerificationCode === code;
+};
+
+// Clear verification code fields
+UserSchema.methods.clearVerificationCode = function() {
+  this.emailVerificationCode = undefined;
+  this.emailVerificationCodeExpires = undefined;
 };
 
 module.exports = mongoose.model('User', UserSchema);

@@ -12,6 +12,8 @@ const {
   deleteFromCloudinary,
   handleCloudinaryError 
 } = require('../config/cloudinary');
+// Import email service
+const { sendEmailVerificationCode, sendWelcomeEmail } = require('../services/emailService');
 
 // Configure multer for memory storage (since we're using Cloudinary)
 const profileStorage = multer.memoryStorage();
@@ -54,13 +56,20 @@ exports.getUserStats = async (req, res) => {
     // Get uploads count from Media collection
     const uploadsCount = await Media.countDocuments({ userId: userId });
     
-    // Get events count - FIX: Use 'creatorId' instead of 'createdBy'
+    // Get events count - Using 'creatorId' field
     const eventsCount = await Event.countDocuments({ creatorId: userId });
 
     res.status(StatusCodes.OK).json({
       success: true,
-      uploadsCount,
-      eventsCount
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage,
+        isEmailVerified: user.isEmailVerified,
+        uploadsCount,
+        eventsCount
+      }
     });
   } catch (error) {
     console.error('Error fetching user stats:', error);
@@ -69,6 +78,116 @@ exports.getUserStats = async (req, res) => {
       message: 'Failed to fetch user statistics'
     });
   }
+};
+
+// @desc    Delete profile image
+// @route   DELETE /api/auth/profile-image
+// @access  Private
+exports.deleteProfileImage = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // If user has a profile image, delete it from Cloudinary
+    if (user.profileImagePublicId) {
+      console.log('Deleting profile image from Cloudinary:', user.profileImagePublicId);
+      const deleteResult = await deleteFromCloudinary(user.profileImagePublicId, 'image');
+      console.log('Profile image deletion result:', deleteResult);
+    }
+
+    // Remove profile image from user record
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { 
+        $unset: { 
+          profileImage: 1, 
+          profileImagePublicId: 1 
+        } 
+      },
+      { new: true }
+    );
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'Profile image deleted successfully',
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        profileImage: updatedUser.profileImage
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting profile image:', error);
+    
+    // Handle Cloudinary-specific errors
+    if (error.http_code || error.message) {
+      return handleCloudinaryError(error, res, 'Profile image deletion failed');
+    }
+
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to delete profile image'
+    });
+  }
+};
+
+// @desc    Logout user / clear cookie
+// @route   GET /api/auth/logout
+// @access  Private
+exports.logout = (req, res) => {
+  res.cookie('token', 'none', {
+    expires: new Date(Date.now() + 10 * 1000), // 10 seconds
+    httpOnly: true
+  });
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: 'User logged out successfully'
+  });
+};
+
+// Helper function to get token from model, create cookie and send response
+const sendTokenResponse = (user, statusCode, res, customMessage = null) => {
+  // Create token
+  const token = user.getSignedJwtToken();
+
+  const options = {
+    expires: new Date(
+      Date.now() + (process.env.JWT_COOKIE_EXPIRE || 30) * 24 * 60 * 60 * 1000
+    ),
+    httpOnly: true
+  };
+
+  // Use secure flag in production
+  if (process.env.NODE_ENV === 'production') {
+    options.secure = true;
+  }
+
+  // Remove password from output
+  user.password = undefined;
+
+  res
+    .status(statusCode)
+    .cookie('token', token, options)
+    .json({
+      success: true,
+      token,
+      message: customMessage || 'Authentication successful',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage,
+        isEmailVerified: user.isEmailVerified
+      }
+    });
 };
 
 // @desc    Upload profile image to Cloudinary
@@ -172,20 +291,171 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create user
+    // Create user (not verified initially)
     const user = await User.create({
       name,
       email,
-      password
+      password,
+      isEmailVerified: false
     });
 
-    // Create token and send response
-    sendTokenResponse(user, StatusCodes.CREATED, res);
+    // Generate and send verification code
+    const verificationCode = user.generateEmailVerificationCode();
+    await user.save({ validateBeforeSave: false });
+
+    try {
+      await sendEmailVerificationCode(user.email, user.name, verificationCode);
+      
+      res.status(StatusCodes.CREATED).json({
+        success: true,
+        message: 'Registration successful! Please check your email for the verification code.',
+        userId: user._id,
+        email: user.email
+      });
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError);
+      // Delete the user if email sending fails
+      await User.findByIdAndDelete(user._id);
+      
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: 'Registration failed. Could not send verification email. Please try again.'
+      });
+    }
   } catch (error) {
     console.error('Registration error:', error);
     res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
       message: error.message || 'Registration failed'
+    });
+  }
+};
+
+// @desc    Verify email with code
+// @route   POST /api/auth/verify-email
+// @access  Public
+exports.verifyEmail = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Email and verification code are required'
+      });
+    }
+
+    // Find user with verification fields
+    const user = await User.findOne({ email })
+      .select('+emailVerificationCode +emailVerificationCodeExpires');
+
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Email is already verified'
+      });
+    }
+
+    // Verify the code
+    if (!user.verifyEmailCode(code)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Invalid or expired verification code'
+      });
+    }
+
+    // Mark email as verified and clear verification code
+    user.isEmailVerified = true;
+    user.clearVerificationCode();
+    await user.save({ validateBeforeSave: false });
+
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail(user.email, user.name).catch(err => {
+      console.error('Error sending welcome email:', err);
+    });
+
+    // Create token and send response
+    sendTokenResponse(user, StatusCodes.OK, res, 'Email verified successfully! Welcome aboard!');
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Email verification failed'
+    });
+  }
+};
+
+// @desc    Resend verification code
+// @route   POST /api/auth/resend-verification
+// @access  Public
+exports.resendVerificationCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    // Find user with verification fields
+    const user = await User.findOne({ email })
+      .select('+emailVerificationCodeSentAt');
+
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'Email is already verified'
+      });
+    }
+
+    // Check if user can send verification code (10 minutes cooldown)
+    if (!user.canSendVerificationCode()) {
+      const timeRemaining = Math.ceil((user.emailVerificationCodeSentAt.getTime() + 10 * 60 * 1000 - Date.now()) / 1000 / 60);
+      return res.status(StatusCodes.TOO_MANY_REQUESTS).json({
+        success: false,
+        message: `Please wait ${timeRemaining} minute(s) before requesting another code`
+      });
+    }
+
+    // Generate and send new verification code
+    const verificationCode = user.generateEmailVerificationCode();
+    await user.save({ validateBeforeSave: false });
+
+    try {
+      await sendEmailVerificationCode(user.email, user.name, verificationCode);
+      
+      res.status(StatusCodes.OK).json({
+        success: true,
+        message: 'Verification code sent successfully! Please check your email.'
+      });
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError);
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: 'Failed to send verification email. Please try again.'
+      });
+    }
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Failed to resend verification code'
     });
   }
 };
@@ -220,6 +490,16 @@ exports.login = async (req, res) => {
       return res.status(StatusCodes.UNAUTHORIZED).json({
         success: false,
         message: 'Invalid credentials'
+      });
+    }
+
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      return res.status(StatusCodes.UNAUTHORIZED).json({
+        success: false,
+        message: 'Please verify your email address before logging in',
+        emailVerificationRequired: true,
+        email: user.email
       });
     }
 
@@ -314,7 +594,8 @@ exports.getMe = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        profileImage: user.profileImage
+        profileImage: user.profileImage,
+        isEmailVerified: user.isEmailVerified
       }
     });
   } catch (error) {
@@ -349,7 +630,8 @@ exports.updateProfile = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        profileImage: user.profileImage
+        profileImage: user.profileImage,
+        isEmailVerified: user.isEmailVerified
       }
     });
   } catch (error) {
@@ -358,112 +640,4 @@ exports.updateProfile = async (req, res) => {
       message: error.message || 'Failed to update profile'
     });
   }
-};
-
-// @desc    Delete profile image
-// @route   DELETE /api/auth/profile-image
-// @access  Private
-exports.deleteProfileImage = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return res.status(StatusCodes.NOT_FOUND).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    // If user has a profile image, delete it from Cloudinary
-    if (user.profileImagePublicId) {
-      console.log('Deleting profile image from Cloudinary:', user.profileImagePublicId);
-      const deleteResult = await deleteFromCloudinary(user.profileImagePublicId, 'image');
-      console.log('Profile image deletion result:', deleteResult);
-    }
-
-    // Remove profile image from user record
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.id,
-      { 
-        $unset: { 
-          profileImage: 1, 
-          profileImagePublicId: 1 
-        } 
-      },
-      { new: true }
-    );
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: 'Profile image deleted successfully',
-      user: {
-        id: updatedUser._id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        profileImage: updatedUser.profileImage
-      }
-    });
-  } catch (error) {
-    console.error('Error deleting profile image:', error);
-    
-    // Handle Cloudinary-specific errors
-    if (error.http_code || error.message) {
-      return handleCloudinaryError(error, res, 'Profile image deletion failed');
-    }
-
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: 'Failed to delete profile image'
-    });
-  }
-};
-
-// @desc    Logout user / clear cookie
-// @route   GET /api/auth/logout
-// @access  Private
-exports.logout = (req, res) => {
-  res.cookie('token', 'none', {
-    expires: new Date(Date.now() + 10 * 1000), // 10 seconds
-    httpOnly: true
-  });
-
-  res.status(StatusCodes.OK).json({
-    success: true,
-    message: 'User logged out successfully'
-  });
-};
-
-// Helper function to get token from model, create cookie and send response
-const sendTokenResponse = (user, statusCode, res) => {
-  // Create token
-  const token = user.getSignedJwtToken();
-
-  const options = {
-    expires: new Date(
-      Date.now() + (process.env.JWT_COOKIE_EXPIRE || 30) * 24 * 60 * 60 * 1000
-    ),
-    httpOnly: true
-  };
-
-  // Use secure flag in production
-  if (process.env.NODE_ENV === 'production') {
-    options.secure = true;
-  }
-
-  // Remove password from output
-  user.password = undefined;
-
-  res
-    .status(statusCode)
-    .cookie('token', token, options)
-    .json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        profileImage: user.profileImage
-      }
-    });
 };

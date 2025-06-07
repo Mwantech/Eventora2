@@ -1,31 +1,37 @@
 const express = require('express');
-const { 
-  register, 
-  login, 
-  getMe, 
+const {
+  register,
+  login,
+  logout,
+  getMe,
   updateProfile,
-  uploadProfileImage,
-  getUserStats,
   changePassword,
-  logout 
+  uploadProfileImage,
+  deleteProfileImage,
+  getUserStats,
+  verifyEmail,
+  resendVerificationCode
 } = require('../controllers/AuthController');
 const { protect } = require('../middleware/authMiddleware');
+const { requireEmailVerification } = require('../middleware/emailVerification');
 
 const router = express.Router();
 
 // Public routes
 router.post('/register', register);
 router.post('/login', login);
+router.post('/verify-email', verifyEmail);
+router.post('/resend-verification', resendVerificationCode);
 
-// Protected routes - require authentication
-router.use(protect); // Apply protection to all routes below
+// Protected routes that require authentication only
+router.get('/logout', protect, logout);
+router.get('/me', protect, getMe);
 
-router.get('/logout', logout);
-router.get('/me', getMe);
-router.put('/updateprofile', updateProfile);
-
-router.put('/change-password', protect, changePassword);
-router.post('/upload-profile-image', uploadProfileImage);
+// Protected routes that require both authentication and email verification
+router.put('/updateprofile', protect, requireEmailVerification, updateProfile);
+router.put('/change-password', protect, requireEmailVerification, changePassword);
+router.post('/upload-profile-image', protect, requireEmailVerification, uploadProfileImage);
+router.delete('/profile-image', protect, requireEmailVerification, deleteProfileImage);
 router.get('/:userId/stats', getUserStats);
 
 module.exports = router;

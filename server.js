@@ -39,7 +39,7 @@ app.use(cookieParser());
 // Enhanced CORS configuration
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:8081',
-  'http://192.168.18.2:8081',
+  'http://192.168.245.59:8081',
   'http://localhost:8081',
   'http://localhost:5173'
 ];
