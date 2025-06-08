@@ -4,12 +4,13 @@ import { Stack, useRouter } from "expo-router";
 import Login from "./components/auth/Login";
 import Register from "./components/auth/Register";
 import EmailVerification from "./components/auth/EmailVerification";
+import WelcomeScreen from "./WelcomeScreen"; // Import the welcome screen
 import { useAuth } from "./services/auth";
 
-type AuthScreenState = 'login' | 'register' | 'verification';
+type AuthScreenState = 'welcome' | 'login' | 'register' | 'verification';
 
 export default function AuthScreen() {
-  const [currentScreen, setCurrentScreen] = useState<AuthScreenState>('login');
+  const [currentScreen, setCurrentScreen] = useState<AuthScreenState>('welcome');
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string>('');
   const { state, login, register, verifyEmail } = useAuth();
   const router = useRouter();
@@ -76,6 +77,15 @@ export default function AuthScreen() {
     setPendingVerificationEmail('');
   };
 
+  // Welcome screen handlers
+  const handleWelcomeGetStarted = () => {
+    setCurrentScreen('register');
+  };
+
+  const handleWelcomeLogin = () => {
+    setCurrentScreen('login');
+  };
+
   const handleSwitchToLogin = () => {
     setCurrentScreen('login');
     setPendingVerificationEmail('');
@@ -88,6 +98,14 @@ export default function AuthScreen() {
 
   const renderCurrentScreen = () => {
     switch (currentScreen) {
+      case 'welcome':
+        return (
+          <WelcomeScreen
+            onGetStarted={handleWelcomeGetStarted}
+            onLogin={handleWelcomeLogin}
+          />
+        );
+
       case 'login':
         return (
           <Login
