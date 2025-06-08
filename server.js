@@ -237,7 +237,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 
 app.use('/api/events', authenticateToken, eventRoutes);
 app.use('/api/analytics', authenticateToken, analyticsRoutes);
-app.use('/api/media', authenticateToken, mediaRoutes); // Fixed: added /media path
+app.use('/api', authenticateToken, mediaRoutes);
 
 // ===========================================
 // ERROR HANDLING
