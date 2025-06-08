@@ -69,8 +69,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
-// Removed API Key validation middleware
-
 // Enhanced CORS configuration for production
 const corsOptions = {
   origin: function (origin, callback) {
@@ -117,7 +115,7 @@ const corsOptions = {
     'Authorization',
     'Cache-Control',
     'Pragma',
-    'x-api-key' // Removed - keeping for backward compatibility
+    'x-api-key'
   ],
   exposedHeaders: ['Authorization'],
   maxAge: 86400 // 24 hours
@@ -148,12 +146,61 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// Removed app version validation middleware
+// ===========================================
+// PUBLIC ENDPOINTS (NO AUTHENTICATION REQUIRED)
+// ===========================================
 
-// Apply stricter rate limiting to auth routes
-app.use('/api/auth', authLimiter);
+// Basic health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Server is running!',
+    status: 'healthy',
+    timestamp: new Date(),
+    uptime: process.uptime()
+  });
+});
 
-// JWT validation middleware for protected routes
+// More detailed status endpoint
+app.get('/api/status', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Server is running!',
+    status: 'operational',
+    timestamp: new Date(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'production',
+    version: process.env.APP_VERSION || '1.0.0',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
+// Simple ping endpoint
+app.get('/ping', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'pong',
+    timestamp: new Date()
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API Server is running',
+    endpoints: {
+      health: '/api/health',
+      status: '/api/status',
+      ping: '/ping'
+    }
+  });
+});
+
+// ===========================================
+// JWT AUTHENTICATION MIDDLEWARE
+// ===========================================
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -177,35 +224,31 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Mount routers
-app.use('/api/auth', authRoutes);
+// ===========================================
+// AUTHENTICATION ROUTES (SPECIAL RATE LIMITING)
+// ===========================================
+
+// Apply stricter rate limiting to auth routes
+app.use('/api/auth', authLimiter, authRoutes);
+
+// ===========================================
+// PROTECTED ROUTES (AUTHENTICATION REQUIRED)
+// ===========================================
+
 app.use('/api/events', authenticateToken, eventRoutes);
 app.use('/api/analytics', authenticateToken, analyticsRoutes);
-app.use('/api', authenticateToken, mediaRoutes);
+app.use('/api/media', authenticateToken, mediaRoutes); // Fixed: added /media path
 
-// Health check endpoint (no auth required)
-app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Server is running!',
-    timestamp: new Date()
-  });
-});
-
-// Public status endpoint
-app.get('/api/status', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Server is running!',
-    timestamp: new Date()
-  });
-});
+// ===========================================
+// ERROR HANDLING
+// ===========================================
 
 // Handle 404
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: 'Route not found',
+    path: req.path
   });
 });
 
@@ -223,7 +266,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Graceful shutdown
+// ===========================================
+// GRACEFUL SHUTDOWN
+// ===========================================
+
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
   process.exit(0);
@@ -234,11 +280,19 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Start server
+// ===========================================
+// START SERVER
+// ===========================================
+
 const PORT = process.env.PORT || 5500;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'production'}`);
+  console.log('Public endpoints available:');
+  console.log(`  - GET /api/health`);
+  console.log(`  - GET /api/status`);
+  console.log(`  - GET /ping`);
+  console.log(`  - GET /`);
 });
 
 module.exports = app;
