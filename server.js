@@ -236,9 +236,9 @@ app.use('/api/auth', authLimiter, authRoutes);
 // PROTECTED ROUTES (AUTHENTICATION REQUIRED)
 // ===========================================
 
-app.use('/api/events', authenticateToken, eventRoutes);
-app.use('/api/analytics', authenticateToken, analyticsRoutes);
-app.use('/api', authenticateToken, mediaRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api', mediaRoutes);
 
 // ===========================================
 // ERROR HANDLING
