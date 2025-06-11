@@ -276,21 +276,25 @@ exports.getEvent = asyncHandler(async (req, res, next) => {
 
   // Calculate upload counts for each participant
   const participantsWithUploads = await Promise.all(
-    participants.map(async (participant) => {
-      // Count media uploads by this participant for this event
-      const uploadCount = await Media.countDocuments({
-        eventId: event._id,
-        userId: participant.userId._id
-      });
+  participants.map(async (participant) => {
+    // Count media uploads by this participant for this event
+    const uploadCount = await Media.countDocuments({
+      eventId: event._id,
+      userId: participant.userId._id
+    });
 
-      return {
-        ...participant.toObject(),
-        uploads: uploadCount,
-        joinedAt: participant.createdAt || new Date(), // Use participant creation date as join date
-        isCreator: participant.role === 'creator'
-      };
-    })
-  );
+    // Use the actual joinedAt from the EventParticipant document
+    // This represents when they actually joined the event
+    const joinedAt = participant.joinedAt || participant.createdAt || new Date();
+
+    return {
+      ...participant.toObject(),
+      uploads: uploadCount,
+      joinedAt: joinedAt, // This should be the actual join time
+      isCreator: participant.role === 'creator'
+    };
+  })
+);
 
   // Populate with creator info
   const populatedEvent = await populateEventWithCreatorInfo(event);

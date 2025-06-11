@@ -37,7 +37,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Rate limiting
+// General rate limiting for all routes
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
@@ -49,18 +49,8 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Apply rate limiting to all requests
+// Apply general rate limiting to all requests
 app.use(limiter);
-
-// Stricter rate limiting for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // limit each IP to 10 auth requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many authentication attempts, please try again later.'
-  }
-});
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -75,7 +65,7 @@ const corsOptions = {
     // Development URLs that should always be allowed
     const developmentOrigins = [
       process.env.CLIENT_URL || 'http://localhost:8081',
-      'http://192.168.245.59:8081',
+      'http://192.168.245.228:8081',
       'https://eventora-app.netlify.app/',
       'http://localhost:8081',
       'http://localhost:5173'
@@ -226,16 +216,13 @@ const authenticateToken = (req, res, next) => {
 };
 
 // ===========================================
-// AUTHENTICATION ROUTES (SPECIAL RATE LIMITING)
+// ROUTES
 // ===========================================
 
-// Apply stricter rate limiting to auth routes
-app.use('/api/auth', authLimiter, authRoutes);
+// Auth routes (auth limiter is now applied within the route file)
+app.use('/api/auth', authRoutes);
 
-// ===========================================
-// PROTECTED ROUTES (AUTHENTICATION REQUIRED)
-// ===========================================
-
+// Protected routes (authentication required)
 app.use('/api/events', eventRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api', mediaRoutes);
