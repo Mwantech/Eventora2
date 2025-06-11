@@ -147,7 +147,7 @@ export default function EmailVerification({
         >
           <View style={verificationStyles.logoContainer}>
             <Image
-              source={require("../../../assets/images/Eventora.png")}
+              source={require("../../../assets/images/logo.png")}
               style={verificationStyles.logoImage}
               resizeMode="contain"
             />

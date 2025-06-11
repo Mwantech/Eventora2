@@ -11,8 +11,9 @@ import {
   SafeAreaView,
   StatusBar,
   Image,
+  useColorScheme,
 } from "react-native";
-import authStyles from "../../styles/authStyles"; // Import the auth styles
+import { getAuthStyles } from "../../styles/authStyles"; // Import the adaptive auth styles
 
 interface RegisterProps {
   onRegister: (name: string, email: string, password: string) => Promise<void>;
@@ -33,6 +34,11 @@ export default function Register({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
+  // Get adaptive styles based on current color scheme
+  const authStyles = getAuthStyles();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const validateForm = () => {
     if (!name.trim()) {
@@ -67,7 +73,10 @@ export default function Register({
 
   return (
     <SafeAreaView style={authStyles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f9f9fc" />
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor={isDark ? "#1a1a1a" : "#f9f9fc"} 
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={authStyles.container}
@@ -82,7 +91,7 @@ export default function Register({
         >
           <View style={authStyles.logoContainer}>
             <Image
-              source={require("../../../assets/images/Eventora.png")} // Replace with your actual logo path
+              source={require("../../../assets/images/logo.png")} // Replace with your actual logo path
               style={authStyles.logoImage}
               resizeMode="contain"
             />
@@ -108,10 +117,10 @@ export default function Register({
                     focusedInput === 'name' && authStyles.inputFocused
                   ]}
                   placeholder="Enter your name"
+                  placeholderTextColor={isDark ? "#888" : "#999"}
                   value={name}
                   onChangeText={setName}
                   editable={!isLoading}
-                  placeholderTextColor="#999"
                   onFocus={() => setFocusedInput('name')}
                   onBlur={() => setFocusedInput(null)}
                 />
@@ -125,12 +134,12 @@ export default function Register({
                     focusedInput === 'email' && authStyles.inputFocused
                   ]}
                   placeholder="Enter your email"
+                  placeholderTextColor={isDark ? "#888" : "#999"}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   editable={!isLoading}
-                  placeholderTextColor="#999"
                   onFocus={() => setFocusedInput('email')}
                   onBlur={() => setFocusedInput(null)}
                 />
@@ -144,13 +153,16 @@ export default function Register({
                     focusedInput === 'password' && authStyles.inputFocused
                   ]}
                   placeholder="Enter your password"
+                  placeholderTextColor={isDark ? "#888" : "#999"}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
                   editable={!isLoading}
-                  placeholderTextColor="#999"
                   onFocus={() => setFocusedInput('password')}
                   onBlur={() => setFocusedInput(null)}
+                  // These props help ensure password dots are visible
+                  textContentType="newPassword"
+                  autoComplete="password-new"
                 />
               </View>
 
@@ -162,13 +174,16 @@ export default function Register({
                     focusedInput === 'confirmPassword' && authStyles.inputFocused
                   ]}
                   placeholder="Confirm your password"
+                  placeholderTextColor={isDark ? "#888" : "#999"}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
                   editable={!isLoading}
-                  placeholderTextColor="#999"
                   onFocus={() => setFocusedInput('confirmPassword')}
                   onBlur={() => setFocusedInput(null)}
+                  // These props help ensure password dots are visible
+                  textContentType="newPassword"
+                  autoComplete="password-new"
                 />
               </View>
 

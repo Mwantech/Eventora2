@@ -10,7 +10,6 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
@@ -92,10 +91,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted, onLogin }) 
         style={styles.backgroundImage}
         resizeMode="cover"
       >
-        <LinearGradient
-          colors={['rgba(0,0,0,0.3)', 'rgba(46,16,101,0.7)', 'rgba(0,0,0,0.8)']}
-          style={styles.overlay}
-        />
+        {/* Multi-layered overlay to simulate gradient */}
+        <View style={styles.overlayTop} />
+        <View style={styles.overlayMiddle} />
+        <View style={styles.overlayBottom} />
         
         {/* Content Container */}
         <View style={styles.contentContainer}>
@@ -145,14 +144,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted, onLogin }) 
               onPress={handleGetStarted}
               activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={['#6B46C1', '#9333EA', '#A855F7']}
-                style={styles.buttonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.primaryButtonText}>Get Started</Text>
-              </LinearGradient>
+              <Text style={styles.primaryButtonText}>Get Started</Text>
             </TouchableOpacity>
             
             {/* Login Button */}
@@ -186,12 +178,30 @@ const styles = StyleSheet.create({
     width: width,
     height: height,
   },
-  overlay: {
+  // Multi-layer overlay approach to simulate gradient
+  overlayTop: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
+    height: '33%',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  overlayMiddle: {
+    position: 'absolute',
+    top: '33%',
+    left: 0,
+    right: 0,
+    height: '34%',
+    backgroundColor: 'rgba(46,16,101,0.7)',
+  },
+  overlayBottom: {
+    position: 'absolute',
     bottom: 0,
+    left: 0,
+    right: 0,
+    height: '33%',
+    backgroundColor: 'rgba(0,0,0,0.8)',
   },
   contentContainer: {
     flex: 1,
@@ -263,18 +273,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 56,
     borderRadius: 28,
-    overflow: 'hidden',
+    backgroundColor: '#8B5CF6', // Solid purple color instead of gradient
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#6B46C1',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
-  },
-  buttonGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 28,
   },
   primaryButtonText: {
     fontSize: 18,
@@ -291,7 +297,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    backdropFilter: 'blur(10px)',
   },
   secondaryButtonText: {
     fontSize: 18,

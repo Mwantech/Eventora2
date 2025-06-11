@@ -263,14 +263,23 @@ export const getUserStats = async (userId?: string): Promise<UserStats> => {
     
     // Use correct backend endpoint
     const response = await apiClient.get(`/auth/${userId}/stats`);
-    const stats = response.data;
     
-    console.log('Raw user stats data:', stats);
+    // FIX: Access the nested data object from the response
+    const responseData = response.data;
+    console.log('Raw API response:', responseData);
+    
+    // Check if the response has the expected structure
+    if (!responseData.success || !responseData.data) {
+      throw new Error('Invalid response format from server');
+    }
+    
+    const statsData = responseData.data; // This contains the actual user data with stats
+    console.log('Extracted stats data:', statsData);
     
     // Map to match backend response structure
     const mappedStats: UserStats = {
-      eventsCount: stats.eventsCount || 0,
-      uploadsCount: stats.uploadsCount || 0,
+      eventsCount: statsData.eventsCount || 0,
+      uploadsCount: statsData.uploadsCount || 0,
     };
     
     console.log('Mapped user stats:', mappedStats);

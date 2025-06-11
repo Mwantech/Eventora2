@@ -51,6 +51,100 @@ export const uploadStyles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
   },
+
+  // Upload Progress Styles
+  progressContainer: {
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  progressHeader: {
+    marginBottom: 12,
+  },
+
+  progressTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+
+  progressSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#8b5cf6',
+    borderRadius: 4,
+  },
+
+  progressStatus: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+
+  fileProgressContainer: {
+    gap: 8,
+  },
+
+  fileProgressItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  fileProgressThumbnail: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+
+  fileProgressInfo: {
+    flex: 1,
+  },
+
+  fileProgressName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+
+  fileProgressBarContainer: {
+    height: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+
+  fileProgressBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
   
   // Updated media container styles (renamed from selectedImagesContainer)
   selectedMediaContainer: {

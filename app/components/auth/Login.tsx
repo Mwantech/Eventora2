@@ -11,8 +11,9 @@ import {
   SafeAreaView,
   StatusBar,
   Image,
+  useColorScheme,
 } from "react-native";
-import authStyles from "../../styles/authStyles"; // Import the auth styles
+import { getAuthStyles } from "../../styles/authStyles"; // Import the adaptive auth styles
 
 interface LoginProps {
   onLogin: (email: string, password: string) => Promise<void>;
@@ -31,6 +32,11 @@ export default function Login({
   const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  
+  // Get adaptive styles based on current color scheme
+  const authStyles = getAuthStyles();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const validateForm = () => {
     if (!email.trim()) {
@@ -57,7 +63,10 @@ export default function Login({
 
   return (
     <SafeAreaView style={authStyles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f9f9fc" />
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor={isDark ? "#1a1a1a" : "#f9f9fc"} 
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={authStyles.container}
@@ -72,7 +81,7 @@ export default function Login({
         >
           <View style={authStyles.logoContainer}>
             <Image
-              source={require("../../../assets/images/Eventora.png")}
+              source={require("../../../assets/images/logo.png")}
               style={authStyles.logoImage}
               resizeMode="contain"
             />
@@ -98,12 +107,12 @@ export default function Login({
                     focusedInput === 'email' && authStyles.inputFocused
                   ]}
                   placeholder="Enter your email"
+                  placeholderTextColor={isDark ? "#888" : "#999"}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   editable={!isLoading}
-                  placeholderTextColor="#999"
                   onFocus={() => setFocusedInput('email')}
                   onBlur={() => setFocusedInput(null)}
                 />
@@ -117,13 +126,16 @@ export default function Login({
                     focusedInput === 'password' && authStyles.inputFocused
                   ]}
                   placeholder="Enter your password"
+                  placeholderTextColor={isDark ? "#888" : "#999"}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
                   editable={!isLoading}
-                  placeholderTextColor="#999"
                   onFocus={() => setFocusedInput('password')}
                   onBlur={() => setFocusedInput(null)}
+                  // These props help ensure password dots are visible
+                  textContentType="password"
+                  autoComplete="password"
                 />
               </View>
 

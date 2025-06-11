@@ -35,6 +35,9 @@ export default function MediaUploadScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<string>("");
+  const [uploadedFiles, setUploadedFiles] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
 
   useEffect(() => {
     if (!id) {
@@ -218,26 +221,53 @@ export default function MediaUploadScreen() {
     setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
+  // Fixed handleUpload function for your MediaUploadScreen component
   const handleUpload = async () => {
     if (selectedMedia.length === 0) {
       Alert.alert("No media selected", "Please select at least one image or video to upload.");
       return;
     }
 
+    // Reset progress states
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadedFiles(0);
+    setTotalFiles(selectedMedia.length);
+    setUploadStatus("Preparing files...");
     
     try {
       // Get media URIs from selected media
       const mediaUris = selectedMedia.map(media => media.uri);
       
-      // Upload using the mediaService
+      // Upload using the mediaService with progress callback
       const uploadedMedia = await uploadMedia(
         id as string,
         mediaUris,
         caption,
-        tags
+        tags,
+        (progress) => {
+          // Ensure progress is always between 0 and 100
+          const clampedProgress = Math.min(100, Math.max(0, Math.round(progress)));
+          setUploadProgress(clampedProgress);
+          
+          // Calculate how many files should be "completed" based on progress
+          // This is an estimation since we get overall progress, not per-file progress
+          const estimatedCompletedFiles = Math.floor((clampedProgress / 100) * selectedMedia.length);
+          setUploadedFiles(estimatedCompletedFiles);
+          
+          if (clampedProgress < 100) {
+            setUploadStatus(`Uploading... ${clampedProgress}%`);
+          } else {
+            setUploadStatus("Processing files...");
+            setUploadedFiles(selectedMedia.length); // All files completed
+          }
+        }
       );
+      
+      // Final state - all files uploaded successfully
+      setUploadProgress(100);
+      setUploadedFiles(selectedMedia.length);
+      setUploadStatus("Upload completed!");
       
       const imageCount = selectedMedia.filter(m => m.type === 'image').length;
       const videoCount = selectedMedia.filter(m => m.type === 'video').length;
@@ -263,12 +293,16 @@ export default function MediaUploadScreen() {
       );
     } catch (error: any) {
       console.error("Error uploading media:", error);
+      setUploadStatus("Upload failed");
       Alert.alert(
         "Upload failed", 
-        error.response?.data?.message || "There was a problem uploading your media."
+        error.response?.data?.message || error.message || "There was a problem uploading your media."
       );
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
+      setUploadedFiles(0);
+      setUploadStatus("");
     }
   };
 
@@ -303,6 +337,92 @@ export default function MediaUploadScreen() {
         </TouchableOpacity>
       </View>
     );
+  };
+
+  // Fixed renderUploadProgress function
+const renderUploadProgress = () => {
+  if (!isUploading) return null;
+
+  // Ensure progress is clamped between 0 and 100
+  const displayProgress = Math.min(100, Math.max(0, uploadProgress));
+
+  return (
+    <View style={uploadStyles.progressContainer}>
+      <View style={uploadStyles.progressHeader}>
+        <Text style={uploadStyles.progressTitle}>Uploading Files</Text>
+        <Text style={uploadStyles.progressSubtitle}>
+          {uploadedFiles}/{totalFiles} files • {displayProgress}%
+        </Text>
+      </View>
+      
+      <View style={uploadStyles.progressBarContainer}>
+        <View 
+          style={[
+            uploadStyles.progressBar, 
+            { width: `${displayProgress}%` }
+          ]} 
+        />
+      </View>
+      
+      <Text style={uploadStyles.progressStatus}>{uploadStatus}</Text>
+      
+      {/* Individual file progress indicators */}
+      <View style={uploadStyles.fileProgressContainer}>
+        {selectedMedia.map((media, index) => {
+          // Calculate individual file progress based on overall progress
+          const fileProgress = getFileProgress(index, displayProgress, selectedMedia.length);
+          
+          return (
+            <View key={index} style={uploadStyles.fileProgressItem}>
+              <View style={uploadStyles.fileProgressThumbnail}>
+                {media.type === 'video' ? (
+                  <Video size={16} color="#8b5cf6" />
+                ) : (
+                  <ImageIcon size={16} color="#8b5cf6" />
+                )}
+              </View>
+              <View style={uploadStyles.fileProgressInfo}>
+                <Text style={uploadStyles.fileProgressName}>
+                  {media.type === 'video' ? 'Video' : 'Image'} {index + 1}
+                </Text>
+                <View style={uploadStyles.fileProgressBarContainer}>
+                  <View 
+                    style={[
+                      uploadStyles.fileProgressBar,
+                      { 
+                        width: `${fileProgress}%`,
+                        backgroundColor: fileProgress === 100 ? '#10b981' : '#8b5cf6'
+                      }
+                    ]} 
+                  />
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+  // Helper function to calculate individual file progress
+  const getFileProgress = (fileIndex: number, overallProgress: number, totalFiles: number): number => {
+    // Calculate progress per file
+    const progressPerFile = 100 / totalFiles;
+    const fileStartProgress = fileIndex * progressPerFile;
+    const fileEndProgress = (fileIndex + 1) * progressPerFile;
+    
+    if (overallProgress <= fileStartProgress) {
+      // File hasn't started yet
+      return 0;
+    } else if (overallProgress >= fileEndProgress) {
+      // File is complete
+      return 100;
+    } else {
+      // File is in progress
+      const fileProgress = ((overallProgress - fileStartProgress) / progressPerFile) * 100;
+      return Math.min(100, Math.max(0, Math.round(fileProgress)));
+    }
   };
 
   if (isLoading) {
@@ -353,6 +473,9 @@ export default function MediaUploadScreen() {
             </Text>
           </View>
 
+          {/* Upload Progress - Show when uploading */}
+          {renderUploadProgress()}
+
           {/* Selected Media */}
           {selectedMedia.length > 0 && (
             <View style={uploadStyles.selectedMediaContainer}>
@@ -372,23 +495,35 @@ export default function MediaUploadScreen() {
             <TouchableOpacity
               style={uploadStyles.uploadOption}
               onPress={takePhoto}
+              disabled={isUploading}
             >
-              <Camera size={20} color="#8b5cf6" />
-              <Text style={uploadStyles.uploadOptionText}>Take Photo</Text>
+              <Camera size={20} color={isUploading ? "#9ca3af" : "#8b5cf6"} />
+              <Text style={[
+                uploadStyles.uploadOptionText,
+                { color: isUploading ? "#9ca3af" : "#8b5cf6" }
+              ]}>Take Photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={uploadStyles.uploadOption}
               onPress={takeVideo}
+              disabled={isUploading}
             >
-              <Video size={20} color="#8b5cf6" />
-              <Text style={uploadStyles.uploadOptionText}>Record Video</Text>
+              <Video size={20} color={isUploading ? "#9ca3af" : "#8b5cf6"} />
+              <Text style={[
+                uploadStyles.uploadOptionText,
+                { color: isUploading ? "#9ca3af" : "#8b5cf6" }
+              ]}>Record Video</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={uploadStyles.uploadOption}
               onPress={pickMedia}
+              disabled={isUploading}
             >
-              <Upload size={20} color="#8b5cf6" />
-              <Text style={uploadStyles.uploadOptionText}>
+              <Upload size={20} color={isUploading ? "#9ca3af" : "#8b5cf6"} />
+              <Text style={[
+                uploadStyles.uploadOptionText,
+                { color: isUploading ? "#9ca3af" : "#8b5cf6" }
+              ]}>
                 Choose from Library
               </Text>
             </TouchableOpacity>
@@ -404,6 +539,7 @@ export default function MediaUploadScreen() {
               multiline
               value={caption}
               onChangeText={setCaption}
+              editable={!isUploading}
             />
           </View>
 
@@ -418,10 +554,15 @@ export default function MediaUploadScreen() {
                 value={currentTag}
                 onChangeText={setCurrentTag}
                 onSubmitEditing={addTag}
+                editable={!isUploading}
               />
               <TouchableOpacity
-                style={uploadStyles.tagButton}
+                style={[
+                  uploadStyles.tagButton,
+                  { backgroundColor: isUploading ? "#9ca3af" : "#8b5cf6" }
+                ]}
                 onPress={addTag}
+                disabled={isUploading}
               >
                 <Tag size={20} color="#ffffff" />
               </TouchableOpacity>
@@ -436,8 +577,11 @@ export default function MediaUploadScreen() {
                     style={uploadStyles.tagItem}
                   >
                     <Text style={uploadStyles.tagText}>#{tag}</Text>
-                    <TouchableOpacity onPress={() => removeTag(tag)}>
-                      <X size={14} color="#8b5cf6" />
+                    <TouchableOpacity 
+                      onPress={() => removeTag(tag)}
+                      disabled={isUploading}
+                    >
+                      <X size={14} color={isUploading ? "#9ca3af" : "#8b5cf6"} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -461,7 +605,9 @@ export default function MediaUploadScreen() {
             {isUploading ? (
               <View style={uploadStyles.uploadButtonContent}>
                 <ActivityIndicator size="small" color="#ffffff" />
-                <Text style={uploadStyles.uploadButtonTextWithIcon}>Uploading...</Text>
+                <Text style={uploadStyles.uploadButtonTextWithIcon}>
+                  {uploadProgress > 0 ? `Uploading ${uploadProgress}%` : 'Preparing...'}
+                </Text>
               </View>
             ) : (
               <Text style={uploadStyles.uploadButtonText}>
