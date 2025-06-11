@@ -426,11 +426,12 @@ exports.deleteMedia = asyncHandler(async (req, res, next) => {
   }
   
   // Allow deletion if user is media uploader or event creator
-  const isUploader = media.userId.toString() === userId;
-  const isEventCreator = event.creatorId.toString() === userId;
+  // Use mongoose's equals method for ObjectId comparison (more reliable)
+  const isUploader = media.userId.equals(userId);
+  const isEventCreator = event.creatorId.equals(userId);
   
   if (!isUploader && !isEventCreator) {
-    return next(new ErrorResponse(`User not authorized to delete this media`, 403));
+    return next(new ErrorResponse(`User not authorized to delete this media. User: ${userId}, Uploader: ${media.userId}, Creator: ${event.creatorId}`, 403));
   }
   
   // Delete from Cloudinary if we have a public ID
@@ -451,8 +452,8 @@ exports.deleteMedia = asyncHandler(async (req, res, next) => {
     }
   }
   
-  // Delete media record
-  await media.remove();
+  // Delete media record - Use findByIdAndDelete for better compatibility
+  await Media.findByIdAndDelete(id);
   
   res.status(200).json({
     success: true,
