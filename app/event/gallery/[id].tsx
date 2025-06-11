@@ -158,75 +158,137 @@ export default function GalleryScreen() {
     return `${fullBaseURL}/uploads/media/${mediaItem.filename}`;
   };
 
-  const handleSaveToDevice = async (mediaItem: any) => {
-    try {
-      const fileUri = getMediaUrl(mediaItem);
-      console.log('Complete media URL:', fileUri);
-      
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert("Permission needed", "Please grant permission to save media");
-        return;
-      }
+const handleSaveToDevice = async (mediaItem: any) => {
+  try {
+    const fileUri = getMediaUrl(mediaItem);
+    console.log('Complete media URL:', fileUri);
+    
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert("Permission needed", "Please grant permission to save media");
+      return;
+    }
 
-      const fileExtension = mediaItem.filename.split('.').pop() || 'jpg';
-      const downloadUri = `${FileSystem.documentDirectory}${Date.now()}.${fileExtension}`;
-      
-      console.log('Downloading from:', fileUri);
-      console.log('Downloading to:', downloadUri);
-      
-      const downloadResult = await FileSystem.downloadAsync(fileUri, downloadUri);
-      
-      if (downloadResult.status === 200) {
-        const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
-        if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
-          await MediaLibrary.saveToLibraryAsync(downloadResult.uri);
-          Alert.alert("Success", "Media saved to your device");
-        } else {
-          throw new Error('Downloaded file is empty or corrupted');
+    // Determine file extension from media type and URL
+    let fileExtension = 'jpg';
+    if (mediaItem.type === 'video') {
+      fileExtension = 'mp4';
+    } else if (fileUri.includes('.')) {
+      // Try to get extension from URL
+      const urlParts = fileUri.split('.');
+      const possibleExtension = urlParts[urlParts.length - 1].split('?')[0].toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(possibleExtension)) {
+        fileExtension = possibleExtension;
+      }
+    }
+    
+    // Create a simple filename with timestamp
+    const timestamp = Date.now();
+    const downloadUri = `${FileSystem.documentDirectory}media_${timestamp}.${fileExtension}`;
+    
+    console.log('Downloading from:', fileUri);
+    console.log('Downloading to:', downloadUri);
+    
+    const downloadResult = await FileSystem.downloadAsync(fileUri, downloadUri);
+    
+    if (downloadResult.status === 200) {
+      const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+      if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
+        // Save to media library
+        const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+        console.log('Asset created:', asset);
+        
+        Alert.alert("Success", "Media saved to your device");
+        
+        // Clean up the temporary file
+        try {
+          await FileSystem.deleteAsync(downloadResult.uri);
+        } catch (cleanupError) {
+          console.log('Could not clean up temp file:', cleanupError);
         }
       } else {
-        throw new Error(`Download failed with status: ${downloadResult.status}`);
+        throw new Error('Downloaded file is empty or corrupted');
       }
-    } catch (err) {
-      console.error("Error saving media:", err);
+    } else {
+      throw new Error(`Download failed with status: ${downloadResult.status}`);
+    }
+  } catch (err) {
+    console.error("Error saving media:", err);
+    
+    // Provide more specific error messages
+    if (err.message.includes('Could not create asset')) {
+      Alert.alert("Error", "Unable to save media to gallery. Please check if the file format is supported and try again.");
+    } else if (err.message.includes('Permission')) {
+      Alert.alert("Permission Error", "Please grant permission to access your photo library in device settings.");
+    } else {
       Alert.alert("Error", `Could not save media: ${err.message}. Please check your internet connection and try again.`);
     }
-  };
+  }
+};
 
-  const handleShareMedia = async (mediaItem: any) => {
-    try {
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert("Sharing isn't available on your platform");
-        return;
-      }
+const handleShareMedia = async (mediaItem: any) => {
+  try {
+    if (!(await Sharing.isAvailableAsync())) {
+      Alert.alert("Sharing isn't available on your platform");
+      return;
+    }
 
-      const fileUri = getMediaUrl(mediaItem);
-      console.log('Sharing media from:', fileUri);
+    const fileUri = getMediaUrl(mediaItem);
+    console.log('Sharing media from:', fileUri);
+    
+    // Clean the filename to remove any path separators and get just the filename
+    let cleanFilename = mediaItem.filename;
+    if (cleanFilename.includes('/')) {
+      // Extract just the filename from the path
+      cleanFilename = cleanFilename.split('/').pop();
+    }
+    
+    // Extract just the file extension from the clean filename
+    const fileExtension = cleanFilename.split('.').pop() || (mediaItem.type === 'video' ? 'mp4' : 'jpg');
+    
+    // Create a simple filename with timestamp to avoid conflicts
+    const timestamp = Date.now();
+    const tempUri = `${FileSystem.documentDirectory}share_${timestamp}.${fileExtension}`;
+    
+    console.log('Downloading for sharing from:', fileUri);
+    console.log('Temporary file path:', tempUri);
+    
+    const downloadResult = await FileSystem.downloadAsync(fileUri, tempUri);
+    
+    console.log('Download result:', downloadResult);
+    
+    if (downloadResult.status === 200) {
+      const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+      console.log('Downloaded file info:', fileInfo);
       
-      const fileExtension = mediaItem.filename.split('.').pop() || 'jpg';
-      const tempUri = `${FileSystem.documentDirectory}temp_${Date.now()}.${fileExtension}`;
-      
-      const downloadResult = await FileSystem.downloadAsync(fileUri, tempUri);
-      
-      if (downloadResult.status === 200) {
-        const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
-        if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
-          await Sharing.shareAsync(downloadResult.uri, {
-            mimeType: mediaItem.type === 'image' ? 'image/jpeg' : 'video/mp4',
-            dialogTitle: mediaItem.caption || 'Share Media',
-          });
-        } else {
-          throw new Error('Downloaded file is empty or corrupted');
+      if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
+        console.log('Sharing file:', downloadResult.uri);
+        
+        await Sharing.shareAsync(downloadResult.uri, {
+          mimeType: mediaItem.type === 'image' ? 'image/jpeg' : 'video/mp4',
+          dialogTitle: mediaItem.caption || 'Share Media',
+        });
+        
+        console.log('File shared successfully');
+        
+        // Clean up the temporary file after sharing
+        try {
+          await FileSystem.deleteAsync(downloadResult.uri);
+          console.log('Temporary file cleaned up');
+        } catch (cleanupError) {
+          console.log('Could not clean up temp file:', cleanupError);
         }
       } else {
-        throw new Error(`Failed to download file for sharing (status: ${downloadResult.status})`);
+        throw new Error('Downloaded file is empty or corrupted');
       }
-    } catch (err) {
-      console.error("Error sharing media:", err);
-      Alert.alert("Error", `Could not share media: ${err.message}`);
+    } else {
+      throw new Error(`Failed to download file for sharing (status: ${downloadResult.status})`);
     }
-  };
+  } catch (err) {
+    console.error("Error sharing media:", err);
+    Alert.alert("Error", `Could not share media: ${err.message}`);
+  }
+};
 
   const handleDeleteMedia = async (mediaItem: any) => {
     Alert.alert(
