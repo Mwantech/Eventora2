@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator, TouchableOpacity, ScrollView, Image, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getEventById, joinEvent, leaveEvent } from "../services/eventService";
-import { Calendar, MapPin, Users, Share, ChevronLeft } from "lucide-react-native";
+import { Calendar, MapPin, Users, Share, ChevronLeft, UserPlus } from "lucide-react-native";
 import type { Event } from "../services/eventService";
 import { useAuth } from "../services/auth";
 import { EventScreenStyles } from "../styles/EventScreenStyles";
@@ -191,6 +191,18 @@ export default function EventScreen() {
     }
   };
 
+  // Navigate to invitation screen
+  const handleInviteUsers = () => {
+    if (!event || !isAuthenticated) {
+      Alert.alert("Authentication Required", "Please log in to invite users");
+      router.replace("/auth");
+      return;
+    }
+    
+    const eventId = event.id || event._id;
+    router.push(`/event/invitation/${eventId}`);
+  };
+
   // Navigate to gallery
   const navigateToGallery = () => {
     if (event) {
@@ -302,42 +314,64 @@ export default function EventScreen() {
       
       {/* Action Buttons */}
       <View style={EventScreenStyles.actionButtonsContainer}>
-        {isCreator ? (
+        <View style={EventScreenStyles.primaryButtonsRow}>
+          {isCreator ? (
+            <TouchableOpacity
+              style={[EventScreenStyles.primaryButton, EventScreenStyles.editButton]}
+              onPress={() => router.push(`/event/edit/${eventId}`)}
+            >
+              <Text style={EventScreenStyles.buttonText}>Edit Event</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                EventScreenStyles.primaryButton,
+                isJoined ? EventScreenStyles.leaveButton : EventScreenStyles.joinButton,
+                (!isAuthenticated || isJoining) && EventScreenStyles.disabledButton
+              ]}
+              onPress={isJoined ? handleLeaveEvent : handleJoinEvent}
+              disabled={isJoining || !isAuthenticated}
+            >
+              {isJoining ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={[
+                  EventScreenStyles.buttonText,
+                  (!isAuthenticated || isJoining) && EventScreenStyles.disabledButtonText
+                ]}>
+                  {isJoined ? "Leave Event" : "Join Event"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
+          
           <TouchableOpacity
-            style={[EventScreenStyles.primaryButton, EventScreenStyles.editButton]}
-            onPress={() => router.push(`/event/edit/${eventId}`)}
+            style={EventScreenStyles.shareButton}
+            onPress={handleShare}
           >
-            <Text style={EventScreenStyles.buttonText}>Edit Event</Text>
+            <Share size={24} color="#8B5CF6" />
           </TouchableOpacity>
-        ) : (
+        </View>
+
+        {/* Invitation Button - Show for creators or joined participants */}
+        {(isCreator || isJoined) && (
           <TouchableOpacity
             style={[
-              EventScreenStyles.primaryButton,
-              isJoined ? EventScreenStyles.leaveButton : EventScreenStyles.joinButton,
-              (!isAuthenticated || isJoining) && EventScreenStyles.disabledButton
+              EventScreenStyles.inviteButton,
+              !isAuthenticated && EventScreenStyles.disabledButton
             ]}
-            onPress={isJoined ? handleLeaveEvent : handleJoinEvent}
-            disabled={isJoining || !isAuthenticated}
+            onPress={handleInviteUsers}
+            disabled={!isAuthenticated}
           >
-            {isJoining ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={[
-                EventScreenStyles.buttonText,
-                (!isAuthenticated || isJoining) && EventScreenStyles.disabledButtonText
-              ]}>
-                {isJoined ? "Leave Event" : "Join Event"}
-              </Text>
-            )}
+            <UserPlus size={20} color="#8B5CF6" />
+            <Text style={[
+              EventScreenStyles.inviteButtonText,
+              !isAuthenticated && EventScreenStyles.disabledButtonText
+            ]}>
+              Invite Friends
+            </Text>
           </TouchableOpacity>
         )}
-        
-        <TouchableOpacity
-          style={EventScreenStyles.shareButton}
-          onPress={handleShare}
-        >
-          <Share size={24} color="#8B5CF6" />
-        </TouchableOpacity>
       </View>
     </View>
   );

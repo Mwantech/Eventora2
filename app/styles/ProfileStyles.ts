@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 // Color palette
-const colors = {
+export const colors = {
   primary: '#8B35C9', // Purple
   primaryDark: '#6B21A8', // Darker purple
   primaryLight: '#A855F7', // Lighter purple
@@ -9,10 +9,12 @@ const colors = {
   background: '#FFFFFF', // White
   surface: '#F8FAFC', // Light gray/white
   text: '#000000', // Black text
+  textPrimary: '#000000', // Black text (alias for consistency)
   textSecondary: '#6B7280', // Gray text
   textLight: '#FFFFFF', // White text
   border: '#E5E7EB', // Light gray border
-  error: '#EF4444', // Red for logout
+  error: '#EF4444', // Red for errors
+  danger: '#EF4444', // Red for logout/danger actions
   overlay: 'rgba(139, 53, 201, 0.1)', // Purple overlay
 };
 
@@ -30,12 +32,25 @@ export const profileStyles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: 16,
+    marginTop: 12,
+  },
+
   notFoundContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background,
     padding: 16,
+  },
+
+  notFoundText: {
+    fontSize: 18,
+    color: colors.textSecondary,
+    marginBottom: 16,
+    textAlign: 'center',
   },
 
   // Header styles
@@ -98,6 +113,11 @@ export const profileStyles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 3,
     borderColor: colors.primary,
+  },
+
+  profileImageError: {
+    borderColor: colors.error,
+    borderWidth: 2,
   },
 
   cameraButton: {
@@ -174,17 +194,50 @@ export const profileStyles = StyleSheet.create({
     fontSize: 14,
   },
 
+  statsLoadingText: {
+    color: colors.textSecondary,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+
   // Recent activity styles
   activitySection: {
     padding: 16,
     backgroundColor: colors.background,
   },
 
+  activityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+
+  activityTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
   activityTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
     color: colors.text,
+    marginLeft: 8,
+  },
+
+  viewAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+
+  viewAllText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   activityPlaceholder: {
@@ -202,6 +255,14 @@ export const profileStyles = StyleSheet.create({
     fontSize: 16,
   },
 
+  // Account Actions styles
+  accountActionsSection: {
+    padding: 16,
+    backgroundColor: colors.background,
+    marginTop: 16,
+    marginBottom: 32,
+  },
+
   // Button styles
   logoutSection: {
     padding: 16,
@@ -212,9 +273,16 @@ export const profileStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.error,
+    backgroundColor: colors.danger,
     paddingVertical: 12,
     borderRadius: 12,
+  },
+
+  logoutText: {
+    color: colors.textLight,
+    fontWeight: 'bold',
+    marginLeft: 8,
+    fontSize: 16,
   },
 
   logoutButtonText: {
@@ -237,137 +305,130 @@ export const profileStyles = StyleSheet.create({
     fontSize: 16,
   },
 
-  notFoundText: {
-    fontSize: 18,
-    color: colors.textSecondary,
-    marginBottom: 16,
-    textAlign: 'center',
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  // Add these styles to your existing profileStyles StyleSheet.create({...}) object:
 
-// Modal styles
-modalContainer: {
-  flex: 1,
-  backgroundColor: colors.background,
-},
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+  },
 
-modalHeader: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  paddingHorizontal: 16,
-  paddingVertical: 12,
-  borderBottomWidth: 1,
-  borderBottomColor: colors.border,
-  backgroundColor: colors.background,
-},
+  modalCloseButton: {
+    padding: 8,
+  },
 
-modalCloseButton: {
-  padding: 8,
-},
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
 
-modalTitle: {
-  fontSize: 18,
-  fontWeight: 'bold',
-  color: colors.text,
-},
+  modalSaveButton: {
+    padding: 8,
+  },
 
-modalSaveButton: {
-  padding: 8,
-},
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
 
-modalContent: {
-  flex: 1,
-  paddingHorizontal: 16,
-  paddingTop: 16,
-},
+  modalImageSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
 
-modalImageSection: {
-  alignItems: 'center',
-  marginBottom: 24,
-},
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+    width: '100%',
+  },
 
-modalSectionTitle: {
-  fontSize: 16,
-  fontWeight: '600',
-  color: colors.text,
-  marginBottom: 8,
-  alignSelf: 'flex-start',
-  width: '100%',
-},
+  modalImageContainer: {
+    position: 'relative',
+    marginTop: 8,
+  },
 
-modalImageContainer: {
-  position: 'relative',
-  marginTop: 8,
-},
+  modalProfileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
 
-modalProfileImage: {
-  width: 80,
-  height: 80,
-  borderRadius: 40,
-  backgroundColor: colors.surface,
-  borderWidth: 2,
-  borderColor: colors.primary,
-},
+  modalCameraButton: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    padding: 6,
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
 
-modalCameraButton: {
-  position: 'absolute',
-  bottom: -4,
-  right: -4,
-  backgroundColor: colors.primary,
-  borderRadius: 16,
-  padding: 6,
-  borderWidth: 2,
-  borderColor: colors.background,
-},
+  modalInputSection: {
+    marginBottom: 20,
+  },
 
-modalInputSection: {
-  marginBottom: 20,
-},
+  modalTextInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: colors.text,
+    backgroundColor: colors.background,
+  },
 
-modalTextInput: {
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 8,
-  paddingHorizontal: 12,
-  paddingVertical: 10,
-  fontSize: 16,
-  color: colors.text,
-  backgroundColor: colors.background,
-},
-
-modalEmailContainer: {
-  backgroundColor: colors.surface,
-  borderRadius: 8,
-  paddingHorizontal: 12,
-  paddingVertical: 10,
-  borderWidth: 1,
-  borderColor: colors.border,
-},
-
-modalEmailText: {
-  fontSize: 16,
-  color: colors.textSecondary,
-  marginBottom: 4,
-},
-
-modalEmailNote: {
-  fontSize: 12,
-  color: colors.textSecondary,
-  fontStyle: 'italic',
-},
-modalTextInputError: {
-    borderColor: '#FF6B6B',
+  modalTextInputError: {
+    borderColor: colors.error,
     borderWidth: 2,
   },
-  
+
   modalErrorText: {
-    color: '#FF6B6B',
+    color: colors.error,
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
   },
-  
+
+  modalEmailContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  modalEmailText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+
+  modalEmailNote: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
+
   modalImageNote: {
     fontSize: 12,
     color: colors.textSecondary,
@@ -375,39 +436,23 @@ modalTextInputError: {
     marginTop: 8,
     fontStyle: 'italic',
   },
-  
-  // Loading states
-  statsLoadingText: {
-    color: colors.textSecondary,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  
-  // Refresh control
-  refreshControlContainer: {
-    flex: 1,
-  },
-  
-  // Profile image container improvements
-  profileImageError: {
-    borderColor: '#FF6B6B',
-    borderWidth: 2,
-  },
-  
+
   // Button disabled states
   buttonDisabled: {
     opacity: 0.5,
   },
-  
+
+  // Refresh control
+  refreshControlContainer: {
+    flex: 1,
+  },
+
   // Activity indicator colors
   activityIndicatorPrimary: {
     color: colors.primary,
   },
-  
+
   activityIndicatorSecondary: {
     color: colors.textSecondary,
   },
 });
-
-// Export colors for use in components
-export { colors };

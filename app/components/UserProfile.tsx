@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   Settings,
   Edit,
+  Bell,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../services/auth";
@@ -28,6 +29,7 @@ import {
   updateUserProfile,
   logoutUser 
 } from "../services/profileService";
+import NotificationsComponent from "./Notification";
 
 interface UserProfileProps {
   userId?: string;
@@ -181,6 +183,10 @@ export default function UserProfile({
     );
   };
 
+  const handleViewAllNotifications = () => {
+    router.push("/notifications");
+  };
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -296,34 +302,40 @@ export default function UserProfile({
             <Text style={profileStyles.statNumber}>{stats.uploadsCount}</Text>
             <Text style={profileStyles.statLabel}>Uploads</Text>
           </View>
-          
         </View>
 
-        {/* Recent Activity */}
+        {/* Recent Activity - Now includes Notifications */}
         <View style={profileStyles.activitySection}>
-          <Text style={profileStyles.activityTitle}>Recent Activity</Text>
-
-          {/* Placeholder for recent activity */}
-          <View style={profileStyles.activityPlaceholder}>
-            <Text style={profileStyles.activityPlaceholderText}>
-              No recent activity available
-            </Text>
-            <Text style={profileStyles.activitySubtext}>
-              Activity tracking will be available soon
-            </Text>
+          <View style={profileStyles.activityHeader}>
+            <View style={profileStyles.activityTitleContainer}>
+              <Bell size={20} color={colors.textPrimary} />
+              <Text style={profileStyles.activityTitle}>Recent Activity</Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleViewAllNotifications}
+              style={profileStyles.viewAllButton}
+            >
+              <Text style={profileStyles.viewAllText}>View All</Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Notifications Component */}
+          <NotificationsComponent
+            userId={userProfile.id}
+            limit={3}
+            showHeader={false}
+          />
         </View>
 
-       
-        {/* Logout Button (only for current user) */}
+        {/* Account Actions */}
         {isCurrentUser && (
-          <View style={profileStyles.logoutSection}>
+          <View style={profileStyles.accountActionsSection}>
             <TouchableOpacity
               onPress={handleLogout}
               style={profileStyles.logoutButton}
             >
-              <LogOut size={20} color={colors.textLight} />
-              <Text style={profileStyles.logoutButtonText}>Logout</Text>
+              <LogOut size={20} color={colors.danger} />
+              <Text style={profileStyles.logoutText}>Logout</Text>
             </TouchableOpacity>
           </View>
         )}

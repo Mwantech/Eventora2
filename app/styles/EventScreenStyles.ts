@@ -405,4 +405,87 @@ export const EventScreenStyles = StyleSheet.create({
   slideUp: {
     transform: [{ translateY: 0 }],
   },
+   actionButtonsContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    gap: 12,
+  },
+  
+  // New style for the primary buttons row
+  primaryButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  
+  // Make the primary button flex to take available space
+  primaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    minHeight: 48,
+  },
+  
+  // Invitation button styles
+  inviteButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 8,
+  },
+  
+  inviteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  
+  // Update existing styles if needed
+  shareButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  
+  // Existing button styles (make sure these match your current ones)
+  joinButton: {
+    backgroundColor: '#8B5CF6',
+  },
+  
+  leaveButton: {
+    backgroundColor: '#EF4444',
+  },
+  
+  editButton: {
+    backgroundColor: '#8B5CF6',
+  },
+  
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  
+  disabledButton: {
+    backgroundColor: '#D1D5DB',
+  },
+  
+  disabledButtonText: {
+    color: '#9CA3AF',
+  },
 });
