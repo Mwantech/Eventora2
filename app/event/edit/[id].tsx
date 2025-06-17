@@ -8,13 +8,15 @@ import {
   Switch, 
   ActivityIndicator,
   Image,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, Calendar, Clock, MapPin, Upload } from 'lucide-react-native';
-import { getEventById, updateEvent } from '../../services/eventService';
+import { ChevronLeft, Calendar, Clock, MapPin, Upload, Camera, ImageIcon, X } from 'lucide-react-native';
+import { getEventById, updateEvent, uploadEventImage } from '../../services/eventService';
 import { useAuth } from '../../services/auth';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { editStyles, screenBreakpoints, iconColors } from '../../styles/EditStyles';
 
 export default function EditEventScreen() {
@@ -24,6 +26,7 @@ export default function EditEventScreen() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -36,6 +39,7 @@ export default function EditEventScreen() {
   const [location, setLocation] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [originalCoverImage, setOriginalCoverImage] = useState<string | null>(null);
   
   // Date and time objects for pickers
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -43,6 +47,21 @@ export default function EditEventScreen() {
 
   // Focus states for inputs
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
+  // Request permissions on component mount
+  useEffect(() => {
+    requestPermissions();
+  }, []);
+
+  const requestPermissions = async () => {
+    // Request camera permissions
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+    const mediaLibraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (cameraPermission.status !== 'granted' || mediaLibraryPermission.status !== 'granted') {
+      console.log('Camera or media library permissions not granted');
+    }
+  };
 
   // Fetch event data
   useEffect(() => {
@@ -78,6 +97,7 @@ export default function EditEventScreen() {
         setLocation(eventData.location || '');
         setIsPrivate(eventData.isPrivate || false);
         setCoverImage(eventData.coverImage || null);
+        setOriginalCoverImage(eventData.coverImage || null);
         
         // If we have a date string, try to parse it for the date picker
         if (eventData.date) {
@@ -167,6 +187,109 @@ export default function EditEventScreen() {
     }
   };
 
+  const showImagePickerOptions = () => {
+    Alert.alert(
+      "Select Image",
+      "Choose how you want to select an image",
+      [
+        {
+          text: "Camera",
+          onPress: () => pickImageFromCamera(),
+        },
+        {
+          text: "Gallery",
+          onPress: () => pickImageFromGallery(),
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const pickImageFromCamera = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9], // Good aspect ratio for event covers
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await handleImageUpload(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image from camera:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const pickImageFromGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9], // Good aspect ratio for event covers
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await handleImageUpload(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image from gallery:', error);
+      Alert.alert('Error', 'Failed to select image. Please try again.');
+    }
+  };
+
+  const handleImageUpload = async (imageUri: string) => {
+    try {
+      setIsUploadingImage(true);
+      
+      // Upload the image and get the URL
+      const uploadedImageUrl = await uploadEventImage(imageUri);
+      
+      // Update the cover image state
+      setCoverImage(uploadedImageUrl);
+      
+      Alert.alert(
+        "Success",
+        "Image uploaded successfully!",
+        [{ text: "OK" }]
+      );
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      Alert.alert(
+        "Upload Failed",
+        error.message || "Failed to upload image. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    Alert.alert(
+      "Remove Image",
+      "Are you sure you want to remove the cover image?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => setCoverImage(null),
+        },
+      ]
+    );
+  };
+
   const handleSave = async () => {
     // Validate form
     if (!name.trim()) {
@@ -226,15 +349,6 @@ export default function EditEventScreen() {
     }
   };
 
-  // Placeholder for image upload - would need to implement with proper image picker
-  const handleImageUpload = () => {
-    Alert.alert(
-      "Upload Image",
-      "Image upload functionality would be implemented here",
-      [{ text: "OK" }]
-    );
-  };
-
   if (isLoading) {
     return (
       <View style={editStyles.loadingContainer}>
@@ -275,19 +389,40 @@ export default function EditEventScreen() {
         <View style={editStyles.coverImageContainer}>
           <Text style={editStyles.label}>Cover Image</Text>
           <TouchableOpacity
-            onPress={handleImageUpload}
+            onPress={showImagePickerOptions}
             style={editStyles.coverImageButton}
+            disabled={isUploadingImage}
           >
-            {coverImage ? (
-              <Image
-                source={{ uri: coverImage }}
-                style={editStyles.coverImage}
-                resizeMode="cover"
-              />
+            {isUploadingImage ? (
+              <View style={editStyles.uploadingContainer}>
+                <ActivityIndicator size="large" color="#8b5cf6" />
+                <Text style={editStyles.uploadingText}>Uploading...</Text>
+              </View>
+            ) : coverImage ? (
+              <View style={editStyles.imageContainer}>
+                <Image
+                  source={{ uri: coverImage }}
+                  style={editStyles.coverImage}
+                  resizeMode="cover"
+                />
+                <TouchableOpacity
+                  onPress={handleRemoveImage}
+                  style={editStyles.removeImageButton}
+                >
+                  <X size={20} color="#ffffff" />
+                </TouchableOpacity>
+                <View style={editStyles.imageOverlay}>
+                  <Camera size={24} color="#ffffff" />
+                  <Text style={editStyles.changeImageText}>Tap to change</Text>
+                </View>
+              </View>
             ) : (
               <View style={editStyles.uploadPlaceholder}>
                 <Upload size={32} color="#8b5cf6" />
                 <Text style={editStyles.uploadText}>Tap to upload image</Text>
+                <Text style={editStyles.uploadSubtext}>
+                  Take a photo or choose from gallery
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -406,10 +541,10 @@ export default function EditEventScreen() {
         {/* Save Button */}
         <TouchableOpacity
           onPress={handleSave}
-          disabled={isSaving}
+          disabled={isSaving || isUploadingImage}
           style={[
             editStyles.saveButton,
-            isSaving && editStyles.saveButtonDisabled
+            (isSaving || isUploadingImage) && editStyles.saveButtonDisabled
           ]}
         >
           {isSaving ? (
