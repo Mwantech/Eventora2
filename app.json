@@ -16,7 +16,7 @@
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.mwantech.eventora"
+      "package": "com.mwangis.eventora"
     },
     "web": {
       "bundler": "metro",
@@ -41,7 +41,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "7be61d3b-67a6-490f-aa54-dddf848295f4"
+        "projectId": "c2f51d91-2916-4aa6-881d-85f2a36b0413"
       }
     }
   }
