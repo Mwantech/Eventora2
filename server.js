@@ -17,6 +17,8 @@ const authRoutes = require('./routes/authRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const inviationRoutes = require('./routes/invitationRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes'); // Import feedback routes
 
 // Initialize app
 const app = express();
@@ -65,7 +67,7 @@ const corsOptions = {
     // Development URLs that should always be allowed
     const developmentOrigins = [
       process.env.CLIENT_URL || 'http://localhost:8081',
-      'http://192.168.245.228:8081',
+      'http://192.168.199.185:8081',
       'https://eventora-app.netlify.app/',
       'http://localhost:8081',
       'http://localhost:5173'
@@ -224,7 +226,9 @@ app.use('/api/auth', authRoutes);
 
 // Protected routes (authentication required)
 app.use('/api/events', eventRoutes);
+app.use('/api/invitations', inviationRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/feedback', feedbackRoutes); // Feedback routes with auth
 app.use('/api', mediaRoutes);
 
 // ===========================================
