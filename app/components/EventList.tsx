@@ -7,11 +7,16 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Plus, User, Calendar, Users, UserPlus , QrCode} from "lucide-react-native";
+import { Plus, User, Calendar, Users, UserPlus, QrCode, MessageCircle, Send, X } from "lucide-react-native";
 import EventCard from "./EventCard";
 import { getAllEvents, getEventsByUserId, getAuthState } from "../services/eventService";
+import apiClient from "../utils/apiClient"; // Import your API client
 import type { Event } from "../services/eventService";
 import { styles } from "../styles/EventListStyles";
 
@@ -33,6 +38,12 @@ export default function EventList({
   const [activeFilter, setActiveFilter] = useState<"all" | "created" | "joined">(filter);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Feedback modal state
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackType, setFeedbackType] = useState<"bug" | "feature" | "general">("general");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   // Load user data first
   useEffect(() => {
@@ -144,6 +155,67 @@ export default function EventList({
     router.push("/join");
   };
 
+  // Feedback functions
+  const openFeedbackModal = () => {
+    setFeedbackModalVisible(true);
+    setFeedbackText("");
+    setFeedbackType("general");
+  };
+
+  const closeFeedbackModal = () => {
+    setFeedbackModalVisible(false);
+    setFeedbackText("");
+    setIsSubmittingFeedback(false);
+  };
+
+  const submitFeedback = async () => {
+    if (!feedbackText.trim()) {
+      Alert.alert("Error", "Please enter your feedback before submitting.");
+      return;
+    }
+
+    setIsSubmittingFeedback(true);
+
+    try {
+      const feedbackData = {
+        message: feedbackText.trim(),
+        type: feedbackType,
+        userId: currentUser?.id || currentUser?._id,
+        userEmail: currentUser?.email,
+        timestamp: new Date().toISOString(),
+        platform: Platform.OS,
+        appVersion: "1.0.0", // You can make this dynamic
+      };
+
+      console.log("Submitting feedback:", feedbackData);
+
+      const response = await apiClient.post('/feedback', feedbackData);
+      
+      console.log("Feedback submitted successfully:", response.data);
+      
+      Alert.alert(
+        "Thank you!",
+        "Your feedback has been submitted successfully. We appreciate your input!",
+        [{ text: "OK", onPress: closeFeedbackModal }]
+      );
+      
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+      
+      let errorMessage = "Failed to submit feedback. Please try again.";
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert("Error", errorMessage);
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
   // Handle id/_id inconsistency in event data
   const renderEventCard = ({ item }: { item: Event }) => {
     if (!item) {
@@ -223,6 +295,12 @@ export default function EventList({
               style={styles.headerButton}
             >
               <QrCode size={20} color="#9333ea" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={openFeedbackModal}
+              style={styles.headerButton}
+            >
+              <MessageCircle size={20} color="#9333ea" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleCreateEvent}
@@ -327,6 +405,94 @@ export default function EventList({
           />
         )}
       </View>
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={feedbackModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeFeedbackModal}
+      >
+        <KeyboardAvoidingView 
+          style={styles.feedbackModalContainer}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.feedbackModalContent}>
+            {/* Modal Header */}
+            <View style={styles.feedbackModalHeader}>
+              <Text style={styles.feedbackModalTitle}>Send Feedback</Text>
+              <TouchableOpacity
+                onPress={closeFeedbackModal}
+                style={styles.feedbackCloseButton}
+              >
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Feedback Type Selection */}
+            <View style={styles.feedbackTypeContainer}>
+              <Text style={styles.feedbackTypeLabel}>Feedback Type:</Text>
+              <View style={styles.feedbackTypeButtons}>
+                {[
+                  { key: "general", label: "General" },
+                  { key: "bug", label: "Bug Report" },
+                  { key: "feature", label: "Feature Request" }
+                ].map((type) => (
+                  <TouchableOpacity
+                    key={type.key}
+                    onPress={() => setFeedbackType(type.key as any)}
+                    style={[
+                      styles.feedbackTypeButton,
+                      feedbackType === type.key && styles.feedbackTypeButtonActive
+                    ]}
+                  >
+                    <Text style={[
+                      styles.feedbackTypeButtonText,
+                      feedbackType === type.key && styles.feedbackTypeButtonTextActive
+                    ]}>
+                      {type.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Feedback Text Input */}
+            <View style={styles.feedbackTextContainer}>
+              <Text style={styles.feedbackTextLabel}>Your Feedback:</Text>
+              <TextInput
+                style={styles.feedbackTextInput}
+                multiline
+                numberOfLines={6}
+                placeholder="Tell us what you think! Your feedback helps us improve the app."
+                placeholderTextColor="#9ca3af"
+                value={feedbackText}
+                onChangeText={setFeedbackText}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              onPress={submitFeedback}
+              disabled={isSubmittingFeedback || !feedbackText.trim()}
+              style={[
+                styles.feedbackSubmitButton,
+                (isSubmittingFeedback || !feedbackText.trim()) && styles.feedbackSubmitButtonDisabled
+              ]}
+            >
+              {isSubmittingFeedback ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Send size={16} color="#FFFFFF" />
+                  <Text style={styles.feedbackSubmitButtonText}>Send Feedback</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }

@@ -231,6 +231,139 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   
+  // Feedback Modal Styles
+  feedbackModalContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  
+  feedbackModalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  
+  feedbackModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    marginBottom: 24,
+  },
+  
+  feedbackModalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  
+  feedbackCloseButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+  },
+  
+  feedbackTypeContainer: {
+    marginBottom: 24,
+  },
+  
+  feedbackTypeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  
+  feedbackTypeButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  
+  feedbackTypeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+    alignItems: 'center',
+  },
+  
+  feedbackTypeButtonActive: {
+    borderColor: '#9333ea',
+    backgroundColor: 'rgba(147, 51, 234, 0.1)',
+  },
+  
+  feedbackTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  
+  feedbackTypeButtonTextActive: {
+    color: '#9333ea',
+  },
+  
+  feedbackTextContainer: {
+    flex: 1,
+    marginBottom: 24,
+  },
+  
+  feedbackTextLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  
+  feedbackTextInput: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1f2937',
+    backgroundColor: '#f9fafb',
+    minHeight: 120,
+  },
+  
+  feedbackSubmitButton: {
+    backgroundColor: '#9333ea',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#9333ea',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 6,
+  },
+  
+  feedbackSubmitButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  
+  feedbackSubmitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  
   // Gradient Background
   gradientBackground: {
     position: 'absolute',
