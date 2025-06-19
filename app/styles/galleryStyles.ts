@@ -6,25 +6,31 @@ export const galleryStyles = StyleSheet.create({
   // Main container
   container: {
     flex: 1,
-    backgroundColor: '#ffffff', // White background
-    paddingTop: 50, // Safe area padding from top
+    backgroundColor: '#f8fafc',
   },
   
-  // Header styles
+  // Header styles - Updated to match the gradient design
   header: {
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+  },
+  
+  headerGradient: {
+    backgroundColor: '#8b5cf6',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff', // White background
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
   },
   
   headerLeft: {
@@ -37,49 +43,75 @@ export const galleryStyles = StyleSheet.create({
     marginRight: 16,
     padding: 8,
     borderRadius: 12,
-    backgroundColor: '#f3f4f6', // Light gray
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  
+  headerTitleContainer: {
+    flex: 1,
   },
   
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1f2937', // Dark gray/black
+    color: '#ffffff',
     letterSpacing: -0.5,
+  },
+  
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
+  },
+  
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  
+  statsButton: {
+    padding: 10,
+    marginRight: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   
   filterButton: {
     padding: 10,
     borderRadius: 12,
-    backgroundColor: '#8b5cf6', // Purple
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   
-  // Filter chips container
+  // Filter chips container - Enhanced design
   filterChipsContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#ffffff', // White background
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#e2e8f0',
   },
   
   filterChipsScrollView: {
     flexGrow: 0,
   },
   
-  // Fixed width filter buttons
   filterChip: {
-    width: 85, // Fixed width
-    height: 36, // Fixed height
     marginRight: 12,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderWidth: 1.5,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  
+  filterChipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   
   filterChipActive: {
-    backgroundColor: '#8b5cf6', // Purple
-    borderColor: '#7c3aed', // Darker purple
+    backgroundColor: '#8b5cf6',
+    borderColor: '#4f46e5',
     shadowColor: '#8b5cf6',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -88,82 +120,131 @@ export const galleryStyles = StyleSheet.create({
   },
   
   filterChipInactive: {
-    backgroundColor: '#ffffff', // White
-    borderColor: '#d1d5db', // Light gray
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
   },
   
   filterChipTextActive: {
-    color: '#ffffff', // White text
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+    marginLeft: 6,
   },
   
   filterChipTextInactive: {
-    color: '#6b7280', // Gray text
+    color: '#64748b',
     fontSize: 14,
     fontWeight: '500',
+    marginLeft: 6,
   },
   
-  // Sort section
+  filterChipBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  
+  filterChipBadgeInactive: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  
+  filterChipBadgeTextActive: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  filterChipBadgeTextInactive: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  // Sort section - Enhanced styling
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: '#ffffff', // White background
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#e2e8f0',
   },
   
   sortLabel: {
-    color: '#6b7280', // Gray
+    color: '#64748b',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     marginRight: 16,
   },
   
   sortOption: {
-    marginRight: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    marginRight: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   
   sortOptionActive: {
-    backgroundColor: '#f3e8ff', // Light purple
+    backgroundColor: '#ede9fe',
+    borderColor: '#8b5cf6',
   },
   
   sortTextActive: {
-    color: '#7c3aed', // Purple
+    color: '#7c3aed',
     fontSize: 14,
     fontWeight: '600',
   },
   
   sortTextInactive: {
-    color: '#6b7280', // Gray
+    color: '#64748b',
     fontSize: 14,
     fontWeight: '500',
   },
   
-  // Media grid
+  // Media grid - Improved spacing and visual hierarchy
   mediaGrid: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 16,
-    backgroundColor: '#ffffff', // White background
+    backgroundColor: '#f8fafc',
   },
   
   mediaItem: {
     flex: 1,
     aspectRatio: 1,
     margin: 4,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#f9fafb', // Very light gray
+    backgroundColor: '#ffffff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  
+  mediaItemTouchable: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  
+  imageContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
   },
   
   mediaImage: {
@@ -171,20 +252,76 @@ export const galleryStyles = StyleSheet.create({
     height: '100%',
   },
   
-  videoIndicator: {
+  // Video specific styles
+  videoThumbnailContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  
+  videoPlayOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -15 }, { translateY: -15 }],
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  mediaTypeIndicator: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)', // Black with transparency
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     borderRadius: 12,
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
   
-  videoIndicatorText: {
-    color: '#ffffff', // White text
-    fontSize: 12,
+  mediaGradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    background: 'linear-gradient(transparent, rgba(0, 0, 0, 0.6))',
+  },
+  
+  likeBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 64, 129, 0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  
+  likeBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
     fontWeight: '600',
+    marginLeft: 2,
+  },
+  
+  mediaUserInfo: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+  },
+  
+  miniUserAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ffffff',
   },
   
   // Empty state
@@ -193,48 +330,51 @@ export const galleryStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-    paddingVertical: 60,
+    paddingVertical: 80,
+    minHeight: 300,
   },
   
   emptyStateText: {
-    color: '#6b7280', // Gray
+    color: '#64748b',
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
+    fontWeight: '500',
   },
   
-  // Floating action button
+  // Floating action button - Enhanced with animation support
   fab: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 32,
     right: 24,
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#8b5cf6', // Purple
+    backgroundColor: '#8b5cf6',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#8b5cf6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
   },
   
   fabText: {
-    color: '#ffffff', // White text
-    fontSize: 24,
+    color: '#ffffff',
+    fontSize: 28,
     fontWeight: '300',
+    lineHeight: 28,
   },
   
-  // Media viewer modal
+  // Media viewer modal - Full screen experience
   mediaViewerContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#000000', // Black background
+    backgroundColor: '#000000',
     zIndex: 1000,
   },
   
@@ -251,78 +391,89 @@ export const galleryStyles = StyleSheet.create({
   },
   
   mediaViewerCloseButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(139, 92, 246, 0.8)', // Purple with transparency
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(99, 102, 241, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   
   mediaViewerCloseText: {
-    color: '#ffffff', // White text
-    fontSize: 18,
-    fontWeight: '500',
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   
   mediaViewerCounter: {
-    backgroundColor: 'rgba(139, 92, 246, 0.8)', // Purple with transparency
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: 'rgba(99, 102, 241, 0.9)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   
   mediaViewerCounterText: {
-    color: '#ffffff', // White text
+    color: '#ffffff',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   
+  // Media slide container
   mediaSlide: {
-  width: screenWidth,
-  flex: 1, // Use flex instead of fixed height
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingHorizontal: 10, // Reduce horizontal padding
-},
-
-// Update swipeableMediaContainer to account for header and info panel
-swipeableMediaContainer: {
-  flex: 1,
-  justifyContent: 'center',
-  paddingTop: 100, // Space for header
-  paddingBottom: 200, // Space for info panel
-},
-
-// Update fullMediaImage to ensure it displays properly
-fullMediaImage: {
-  width: screenWidth - 20, // Account for padding
-  height: undefined, // Let height be calculated automatically
-  aspectRatio: 1, // Maintain aspect ratio, adjust as needed
-  maxHeight: screenHeight * 0.5, // Limit max height
-  borderRadius: 12,
-  resizeMode: 'contain', // Make sure this is contain, not cover
-},
-
-// Keep fullMediaVideo as is but ensure proper sizing
-fullMediaVideo: {
-  width: screenWidth - 20, // Account for padding
-  height: screenHeight * 0.4, // Reasonable height for videos
-  borderRadius: 12,
-},
-
-// Limit the info panel height
-mediaInfoPanel: {
-  position: 'absolute',
-  bottom: 0,
-  left: 0,
-  right: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.9)',
-  paddingHorizontal: 20,
-  paddingVertical: 20,
-  paddingBottom: 40,
-  maxHeight: 180, // Limit the height of the info panel
-},
+    width: screenWidth,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  
+  swipeableMediaContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingTop: 120,
+    paddingBottom: 220,
+  },
+  
+  fullMediaImage: {
+    width: screenWidth - 20,
+    height: undefined,
+    aspectRatio: 1,
+    maxHeight: screenHeight * 0.6,
+    borderRadius: 12,
+    resizeMode: 'contain',
+  },
+  
+  fullMediaVideo: {
+    width: screenWidth - 20,
+    height: screenHeight * 0.5,
+    borderRadius: 12,
+  },
+  
+  // Media info panel - Enhanced design
+  mediaInfoPanel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    backdropFilter: 'blur(10px)',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingBottom: 40,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
   
   mediaInfoHeader: {
     flexDirection: 'row',
@@ -334,18 +485,21 @@ mediaInfoPanel: {
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   
   userAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 10,
-    backgroundColor: '#8b5cf6', // Purple
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+    backgroundColor: '#8b5cf6',
+    borderWidth: 2,
+    borderColor: '#ffffff',
   },
   
   userName: {
-    color: '#ffffff', // White text
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -356,15 +510,15 @@ mediaInfoPanel: {
   },
   
   timeText: {
-    color: '#d1d5db', // Light gray
+    color: '#cbd5e1',
     fontSize: 12,
     marginLeft: 4,
   },
   
   mediaCaption: {
-    color: '#ffffff', // White text
-    fontSize: 14,
-    lineHeight: 20,
+    color: '#ffffff',
+    fontSize: 15,
+    lineHeight: 22,
     marginBottom: 12,
   },
   
@@ -375,54 +529,149 @@ mediaInfoPanel: {
   },
   
   tag: {
-    backgroundColor: 'rgba(139, 92, 246, 0.6)', // Purple with transparency
+    backgroundColor: 'rgba(99, 102, 241, 0.7)',
     borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 6,
-    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 6,
   },
   
   tagText: {
-    color: '#ffffff', // White text
+    color: '#ffffff',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   
-  // Action buttons
+  // Action buttons - Enhanced interaction design
   actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    marginTop: 8,
   },
   
   actionButton: {
     alignItems: 'center',
     minWidth: 60,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  
+  actionButtonLiked: {
+    backgroundColor: 'rgba(255, 64, 129, 0.2)',
+  },
+  
+  actionButtonDelete: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
   },
   
   actionButtonText: {
-    color: '#ffffff', // White text
+    color: '#ffffff',
     fontSize: 12,
     marginTop: 4,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  
+  actionButtonTextLiked: {
+    color: '#ff4081',
   },
   
   actionButtonTextDelete: {
-    color: '#ef4444', // Red for delete
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '500',
+    color: '#ef4444',
   },
   
-  likeCount: {
-    color: '#ffffff', // White text
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '500',
+  // Stats modal
+  statsModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    width: screenWidth * 0.9,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   
-  // Filter modal
+  statsModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  
+  statsModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  
+  statsModalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  statsModalCloseText: {
+    color: '#64748b',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  statsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  
+  statCard: {
+    width: '48%',
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  
+  statLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  
+  // Filter modal - Enhanced design
   modalOverlay: {
     position: 'absolute',
     top: 0,
@@ -435,9 +684,9 @@ mediaInfoPanel: {
   },
   
   modalContent: {
-    backgroundColor: '#ffffff', // White background
-    borderRadius: 20,
-    width: screenWidth * 0.85,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    width: screenWidth * 0.9,
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
@@ -447,120 +696,125 @@ mediaInfoPanel: {
   },
   
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#1f2937', // Dark gray/black
-    marginBottom: 20,
+    color: '#1e293b',
+    marginBottom: 24,
+    textAlign: 'center',
   },
   
   modalSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151', // Dark gray
+    color: '#475569',
     marginBottom: 12,
+    marginTop: 8,
   },
   
   modalButtonRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginBottom: 20,
+    gap: 8,
   },
   
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 8,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
   },
   
   modalButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 16,
     marginLeft: 12,
+    minWidth: 80,
+    alignItems: 'center',
   },
   
   modalButtonCancel: {
-    backgroundColor: '#f3f4f6', // Light gray
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
   },
   
   modalButtonApply: {
-    backgroundColor: '#8b5cf6', // Purple
+    backgroundColor: '#8b5cf6',
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   
   modalButtonTextCancel: {
-    color: '#6b7280', // Gray
+    color: '#64748b',
     fontSize: 14,
     fontWeight: '600',
   },
   
   modalButtonTextApply: {
-    color: '#ffffff', // White text
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
   },
   
-  // Loading state
+  // Loading states
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff', // White background
+    backgroundColor: '#f8fafc',
   },
   
-  // Error state
+  loadingContent: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  
+  loadingText: {
+    color: '#64748b',
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 16,
+  },
+  
+  // Error states
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff', // White background
-    paddingHorizontal: 20,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 32,
   },
   
   errorTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#ef4444', // Red
-    marginBottom: 8,
+    color: '#ef4444',
+    marginBottom: 16,
     textAlign: 'center',
   },
   
   errorButton: {
-    backgroundColor: '#8b5cf6', // Purple
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    marginTop: 16,
+    backgroundColor: '#8b5cf6',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   
   errorButtonText: {
-    color: '#ffffff', // White text
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-  },
-
-  // Video thumbnail container and overlay
-  videoThumbnailContainer: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  },
-
-  videoPlayOverlay: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Full media video player
-  fullMediaVideo: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 12,
   },
 });
