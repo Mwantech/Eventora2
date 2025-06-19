@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Plus, User, Calendar, Users, UserPlus, QrCode, MessageCircle, Send, X } from "lucide-react-native";
+import { Plus, User, Calendar, Users, UserPlus, QrCode, MessageCircle, Send, X, Search } from "lucide-react-native";
 import EventCard from "./EventCard";
 import { getAllEvents, getEventsByUserId, getAuthState } from "../services/eventService";
 import apiClient from "../utils/apiClient"; // Import your API client
@@ -38,6 +38,11 @@ export default function EventList({
   const [activeFilter, setActiveFilter] = useState<"all" | "created" | "joined">(filter);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [searchInputFocused, setSearchInputFocused] = useState(false);
   
   // Feedback modal state
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
@@ -137,6 +142,75 @@ export default function EventList({
       fetchEvents();
     }
   }, [currentUser, fetchEvents]);
+
+  // Search functionality with memoization for performance
+  const filteredEvents = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return events;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    return events.filter(event => {
+      const name = event.name?.toLowerCase() || "";
+      const location = event.location?.toLowerCase() || "";
+      const description = event.description?.toLowerCase() || "";
+      
+      return name.includes(query) || 
+             location.includes(query) || 
+             description.includes(query);
+    });
+  }, [events, searchQuery]);
+
+  // Search suggestions - show top 5 matching events when typing
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      return [];
+    }
+
+    return filteredEvents.slice(0, 5);
+  }, [filteredEvents, searchQuery]);
+
+  // Handle search input changes
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    setShowSearchSuggestions(text.length >= 2);
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionSelect = (event: Event) => {
+    setSearchQuery(event.name || "");
+    setShowSearchSuggestions(false);
+    setSearchInputFocused(false);
+    
+    // Navigate to event details
+    const eventId = event.id || event._id;
+    if (eventId) {
+      router.push(`/event/${eventId}`);
+    }
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery("");
+    setShowSearchSuggestions(false);
+  };
+
+  // Handle search input focus
+  const handleSearchFocus = () => {
+    setSearchInputFocused(true);
+    if (searchQuery.length >= 2) {
+      setShowSearchSuggestions(true);
+    }
+  };
+
+  // Handle search input blur
+  const handleSearchBlur = () => {
+    // Delay hiding suggestions to allow for tap selection
+    setTimeout(() => {
+      setSearchInputFocused(false);
+      setShowSearchSuggestions(false);
+    }, 200);
+  };
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -243,6 +317,34 @@ export default function EventList({
     );
   };
 
+  // Render search suggestion item
+  const renderSearchSuggestion = ({ item }: { item: Event }) => (
+    <TouchableOpacity
+      style={styles.searchSuggestionItem}
+      onPress={() => handleSuggestionSelect(item)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.searchSuggestionContent}>
+        <Text style={styles.searchSuggestionTitle} numberOfLines={1}>
+          {item.name || "Unnamed Event"}
+        </Text>
+        {item.location && (
+          <Text style={styles.searchSuggestionSubtitle} numberOfLines={1}>
+            📍 {item.location}
+          </Text>
+        )}
+        {item.date && (
+          <Text style={styles.searchSuggestionDate} numberOfLines={1}>
+            📅 {new Date(item.date).toLocaleDateString()}
+          </Text>
+        )}
+      </View>
+      <View style={styles.searchSuggestionArrow}>
+        <Text style={styles.searchSuggestionArrowText}>→</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   // Safe keyExtractor that handles both id and _id
   const keyExtractor = (item: Event, index: number) => {
     return (item && (item.id || item._id)) ? (item.id || item._id).toString() : `fallback-key-${index}`;
@@ -254,63 +356,118 @@ export default function EventList({
         <Calendar size={32} color="#9333ea" />
       </View>
       <Text style={styles.emptyTitle}>
-        {error ? "Something went wrong" : "No events yet"}
+        {error ? "Something went wrong" : searchQuery ? "No matching events" : "No events yet"}
       </Text>
       <Text style={styles.emptySubtitle}>
         {error 
           ? "We couldn't load your events. Please try again." 
-          : activeFilter === "all" 
-            ? "Create your first event to get started!" 
-            : `No ${activeFilter} events found. Try a different filter or create a new event.`
+          : searchQuery
+            ? `No events found matching "${searchQuery}". Try a different search term.`
+            : activeFilter === "all" 
+              ? "Create your first event to get started!" 
+              : `No ${activeFilter} events found. Try a different filter or create a new event.`
         }
       </Text>
-      <TouchableOpacity
-        onPress={handleCreateEvent}
-        style={styles.createButton}
-      >
-        <Text style={styles.createButtonText}>Create Event</Text>
-      </TouchableOpacity>
+      {searchQuery ? (
+        <TouchableOpacity
+          onPress={clearSearch}
+          style={styles.clearSearchButton}
+        >
+          <Text style={styles.clearSearchButtonText}>Clear Search</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={handleCreateEvent}
+          style={styles.createButton}
+        >
+          <Text style={styles.createButtonText}>Create Event</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
   return (
     <View style={styles.container}>
-      {/* Modern Header */}
+      {/* Modern Header with Integrated Search */}
       <View style={styles.headerContainer}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
             <Text style={styles.appName}>Eventora</Text>
-            <Text style={styles.headerTitle}>My Events</Text>
+            <Text style={styles.headerSubtitle}>Discover amazing events</Text>
           </View>
           
+          {/* Header Actions */}
           <View style={styles.headerActions}>
             <TouchableOpacity
               onPress={() => router.push("/profile")}
-              style={styles.headerButton}
+              style={styles.profileButton}
             >
-              <User size={20} color="#9333ea" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleJoinEvent}
-              style={styles.headerButton}
-            >
-              <QrCode size={20} color="#9333ea" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={openFeedbackModal}
-              style={styles.headerButton}
-            >
-              <MessageCircle size={20} color="#9333ea" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleCreateEvent}
-              style={styles.headerButton}
-            >
-              <Plus size={20} color="#9333ea" />
+              <User size={22} color="#1f2937" />
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Compact Search Bar in Header */}
+        <View style={styles.headerSearchContainer}>
+          <View style={[
+            styles.headerSearchInputContainer,
+            searchInputFocused && styles.headerSearchInputContainerFocused
+          ]}>
+            <Search size={18} color="#6b7280" style={styles.headerSearchIcon} />
+            <TextInput
+              style={styles.headerSearchInput}
+              placeholder="Search events..."
+              placeholderTextColor="#9ca3af"
+              value={searchQuery}
+              onChangeText={handleSearchChange}
+              onFocus={handleSearchFocus}
+              //onBlur={handleSearchBlur}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={clearSearch}
+                style={styles.headerSearchClearButton}
+              >
+                <X size={14} color="#6b7280" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Action Buttons Row */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            onPress={handleJoinEvent}
+            style={styles.secondaryActionButton}
+          >
+            <QrCode size={18} color="#6366f1" />
+            <Text style={styles.secondaryActionButtonText}>Join Event</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={handleCreateEvent}
+            style={styles.primaryActionButton}
+          >
+            <Plus size={18} color="#FFFFFF" />
+            <Text style={styles.primaryActionButtonText}>Create Event</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Search Suggestions (positioned below header) */}
+      {showSearchSuggestions && searchSuggestions.length > 0 && (
+        <View style={styles.searchSuggestionsContainer}>
+          <FlatList
+            data={searchSuggestions}
+            renderItem={renderSearchSuggestion}
+            keyExtractor={keyExtractor}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+          />
+        </View>
+      )}
 
       {/* Modern Filter Tabs */}
       <View style={styles.filterContainer}>
@@ -366,6 +523,16 @@ export default function EventList({
         </TouchableOpacity>
       </View>
 
+      {/* Search Results Count */}
+      {searchQuery && (
+        <View style={styles.searchResultsHeader}>
+          <Text style={styles.searchResultsText}>
+            {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
+            {searchQuery && ` for "${searchQuery}"`}
+          </Text>
+        </View>
+      )}
+
       {/* Error Message */}
       {error && (
         <View style={styles.errorContainer}>
@@ -388,7 +555,7 @@ export default function EventList({
           </View>
         ) : (
           <FlatList
-            data={events}
+            data={filteredEvents}
             renderItem={renderEventCard}
             keyExtractor={keyExtractor}
             contentContainerStyle={styles.listContainer}
@@ -402,9 +569,19 @@ export default function EventList({
               />
             }
             ListEmptyComponent={renderEmptyState}
+            keyboardShouldPersistTaps="handled"
           />
         )}
       </View>
+
+      {/* Floating Feedback Button */}
+      <TouchableOpacity
+        onPress={openFeedbackModal}
+        style={styles.floatingFeedbackButton}
+        activeOpacity={0.8}
+      >
+        <MessageCircle size={24} color="#FFFFFF" />
+      </TouchableOpacity>
 
       {/* Feedback Modal */}
       <Modal
