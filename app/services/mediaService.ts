@@ -90,14 +90,58 @@ export const getEventMedia = async (
   try {
     // Construct query params for filtering and sorting
     const params = new URLSearchParams();
-    if (filter) params.append('filter', filter);
+    
+    // Fix the filter parameter mapping
+    if (filter && filter !== 'all') {
+      // Map frontend filter values to backend expected values
+      if (filter === 'images') {
+        params.append('type', 'image');
+      } else if (filter === 'videos') {
+        params.append('type', 'video');
+      } else {
+        params.append('type', filter);
+      }
+    }
+    
     if (sort) params.append('sort', sort);
     
     const queryString = params.toString();
     const url = `/events/${eventId}/media${queryString ? `?${queryString}` : ''}`;
     
+    console.log('Fetching media with URL:', url); // Debug log
+    
     const response = await apiClient.get(url);
-    const media = response.data.data;
+    let media = response.data.data;
+    
+    // Client-side filtering as backup (in case backend doesn't support filtering)
+    if (filter && filter !== 'all' && Array.isArray(media)) {
+      media = media.filter(item => {
+        if (filter === 'images') {
+          return item.type === 'image';
+        } else if (filter === 'videos') {
+          return item.type === 'video';
+        }
+        return true;
+      });
+    }
+    
+    // Client-side sorting as backup (in case backend doesn't support sorting)
+    if (sort && Array.isArray(media)) {
+      media = media.sort((a, b) => {
+        switch (sort) {
+          case 'newest':
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          case 'oldest':
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          case 'popular':
+            return (b.likes || 0) - (a.likes || 0);
+          default:
+            return 0;
+        }
+      });
+    }
+    
+    console.log(`Filtered media: ${media.length} items, filter: ${filter}`); // Debug log
     
     // Map _id to id and add formatted timestamp
     return Array.isArray(media) 
