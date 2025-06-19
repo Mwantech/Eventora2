@@ -1,11 +1,9 @@
-// Update the apiClient.js to ensure consistent ObjectId handling
-
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create axios instance
 const apiClient = axios.create({
-  baseURL: process.env.API_URL || 'http://192.168.131.36:5500/api',
+  baseURL: process.env.API_URL || 'https://eventora.up.railway.app/api',
   headers: {
     'Content-Type': 'application/json'
   },
