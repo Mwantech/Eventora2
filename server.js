@@ -68,7 +68,7 @@ const corsOptions = {
     const developmentOrigins = [
       process.env.CLIENT_URL || 'http://localhost:8081',
       'http://192.168.199.185:8081',
-      'https://eventora-app.netlify.app/',
+      'https://eventora-app.netlify.app',
       'http://localhost:8081',
       'http://localhost:5173'
     ];
