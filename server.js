@@ -379,24 +379,56 @@ app.use((err, req, res, next) => {
 // GRACEFUL SHUTDOWN
 // ===========================================
 
-const gracefulShutdown = () => {
+const gracefulShutdown = async () => {
   console.log('Received shutdown signal, shutting down gracefully...');
   
   // Stop keep-alive service
   if (keepAliveService) {
     console.log('Stopping keep-alive service...');
-    keepAliveService.stop();
+    try {
+      keepAliveService.stop();
+      console.log('Keep-alive service stopped successfully');
+    } catch (error) {
+      console.error('Error stopping keep-alive service:', error.message);
+    }
   }
   
-  // Close MongoDB connection
-  mongoose.connection.close(() => {
-    console.log('MongoDB connection closed');
-    process.exit(0);
-  });
+  // Close server first
+  if (server) {
+    console.log('Closing HTTP server...');
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+  }
+  
+  // Close MongoDB connection (updated for newer Mongoose versions)
+  try {
+    console.log('Closing MongoDB connection...');
+    await mongoose.connection.close(); // Remove callback, use async/await
+    console.log('MongoDB connection closed successfully');
+  } catch (error) {
+    console.error('Error closing MongoDB connection:', error.message);
+  }
+  
+  // Exit process
+  process.exit(0);
 };
 
+// Handle shutdown signals
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  gracefulShutdown();
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  gracefulShutdown();
+});
 
 // ===========================================
 // START SERVER
