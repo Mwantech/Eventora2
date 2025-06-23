@@ -23,6 +23,10 @@ const feedbackRoutes = require('./routes/feedbackRoutes'); // Import feedback ro
 // Initialize app
 const app = express();
 
+// ===========================================
+// DATABASE CONNECTION
+// ===========================================
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI || '', {
   useNewUrlParser: true,
@@ -33,6 +37,10 @@ mongoose.connect(process.env.MONGO_URI || '', {
   console.error('MongoDB connection error:', err);
   process.exit(1);
 });
+
+// ===========================================
+// SECURITY MIDDLEWARE
+// ===========================================
 
 // Security middleware
 app.use(helmet({
@@ -53,6 +61,10 @@ const limiter = rateLimit({
 
 // Apply general rate limiting to all requests
 app.use(limiter);
+
+// ===========================================
+// MIDDLEWARE
+// ===========================================
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -168,12 +180,38 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Simple ping endpoint
+// Enhanced ping endpoint with keep-alive features
 app.get('/ping', (req, res) => {
+  const timestamp = new Date();
+  
   res.json({ 
     success: true, 
     message: 'pong',
-    timestamp: new Date()
+    timestamp: timestamp,
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    pid: process.pid,
+    version: process.env.APP_VERSION || '1.0.0',
+    keepAlive: true,
+    environment: process.env.NODE_ENV || 'production'
+  });
+});
+
+// Keep-alive status endpoint
+app.get('/api/keep-alive/status', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Keep-alive monitoring endpoint',
+    server: {
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      timestamp: new Date(),
+      environment: process.env.NODE_ENV || 'production'
+    },
+    database: {
+      status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      name: mongoose.connection.name || 'unknown'
+    }
   });
 });
 
@@ -185,7 +223,8 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       status: '/api/status',
-      ping: '/ping'
+      ping: '/ping',
+      keepAliveStatus: '/api/keep-alive/status'
     }
   });
 });
@@ -194,28 +233,6 @@ app.get('/', (req, res) => {
 // JWT AUTHENTICATION MIDDLEWARE
 // ===========================================
 
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Access token required'
-    });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({
-        success: false,
-        message: 'Invalid or expired token'
-      });
-    }
-    req.user = user;
-    next();
-  });
-};
 
 // ===========================================
 // ROUTES
@@ -230,6 +247,106 @@ app.use('/api/invitations', inviationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/feedback', feedbackRoutes); // Feedback routes with auth
 app.use('/api', mediaRoutes);
+
+// ===========================================
+// KEEP-ALIVE SERVICE SETUP
+// ===========================================
+
+let keepAliveService = null;
+
+// Only run keep-alive in production or when explicitly enabled
+const shouldRunKeepAlive = process.env.NODE_ENV === 'production' || 
+                          process.env.ENABLE_KEEP_ALIVE === 'true';
+
+if (shouldRunKeepAlive) {
+  try {
+    const { createKeepAliveService } = require('./keep-alive');
+    
+    // Get the service URL from environment or construct it
+    const serviceUrl = process.env.RENDER_EXTERNAL_URL || 
+                      (process.env.RENDER_SERVICE_NAME ? 
+                        `https://${process.env.RENDER_SERVICE_NAME}.onrender.com` : null) ||
+                      `http://localhost:${process.env.PORT || 5500}`;
+    
+    keepAliveService = createKeepAliveService(`${serviceUrl}/ping`, 14);
+    
+    console.log(`🔄 Keep-alive service configured for: ${serviceUrl}/ping`);
+    
+    // Keep-alive control endpoints (for debugging/monitoring)
+    app.get('/api/keep-alive/start', (req, res) => {
+      try {
+        if (keepAliveService) {
+          keepAliveService.start();
+          res.json({ 
+            success: true, 
+            message: 'Keep-alive service started',
+            url: `${serviceUrl}/ping`
+          });
+        } else {
+          res.status(500).json({ 
+            success: false, 
+            message: 'Keep-alive service not initialized' 
+          });
+        }
+      } catch (error) {
+        res.status(500).json({ 
+          success: false, 
+          message: error.message 
+        });
+      }
+    });
+    
+    app.get('/api/keep-alive/stop', (req, res) => {
+      try {
+        if (keepAliveService) {
+          keepAliveService.stop();
+          res.json({ 
+            success: true, 
+            message: 'Keep-alive service stopped' 
+          });
+        } else {
+          res.status(404).json({ 
+            success: false, 
+            message: 'Keep-alive service not found' 
+          });
+        }
+      } catch (error) {
+        res.status(500).json({ 
+          success: false, 
+          message: error.message 
+        });
+      }
+    });
+    
+    app.get('/api/keep-alive/info', (req, res) => {
+      try {
+        if (keepAliveService) {
+          res.json({
+            success: true,
+            ...keepAliveService.getStatus(),
+            targetUrl: `${serviceUrl}/ping`
+          });
+        } else {
+          res.status(404).json({
+            success: false,
+            message: 'Keep-alive service not initialized'
+          });
+        }
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: error.message
+        });
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to initialize keep-alive service:', error.message);
+    console.log('Make sure to install: npm install node-cron');
+  }
+} else {
+  console.log('ℹ️  Keep-alive service disabled (not in production)');
+}
 
 // ===========================================
 // ERROR HANDLING
@@ -262,29 +379,57 @@ app.use((err, req, res, next) => {
 // GRACEFUL SHUTDOWN
 // ===========================================
 
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
+const gracefulShutdown = () => {
+  console.log('Received shutdown signal, shutting down gracefully...');
+  
+  // Stop keep-alive service
+  if (keepAliveService) {
+    console.log('Stopping keep-alive service...');
+    keepAliveService.stop();
+  }
+  
+  // Close MongoDB connection
+  mongoose.connection.close(() => {
+    console.log('MongoDB connection closed');
+    process.exit(0);
+  });
+};
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 // ===========================================
 // START SERVER
 // ===========================================
 
 const PORT = process.env.PORT || 5500;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'production'}`);
-  console.log('Public endpoints available:');
+
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'production'}`);
+  console.log('🌐 Public endpoints available:');
   console.log(`  - GET /api/health`);
   console.log(`  - GET /api/status`);
   console.log(`  - GET /ping`);
+  console.log(`  - GET /api/keep-alive/status`);
   console.log(`  - GET /`);
+  
+  // Start keep-alive service after server is fully running
+  if (shouldRunKeepAlive && keepAliveService) {
+    setTimeout(() => {
+      try {
+        keepAliveService.start();
+        console.log('✅ Keep-alive service started successfully');
+      } catch (error) {
+        console.error('❌ Failed to start keep-alive service:', error.message);
+      }
+    }, 60000); // Wait 30 seconds after server start
+  }
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  console.error('Server error:', error);
 });
 
 module.exports = app;
