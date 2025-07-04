@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,18 +13,60 @@ import {
   Image,
   useColorScheme,
 } from "react-native";
-import { getAuthStyles } from "../../styles/authStyles"; // Import the adaptive auth styles
+import { getAuthStyles } from "../../styles/authStyles";
 
 interface RegisterProps {
   onRegister: (name: string, email: string, password: string) => Promise<void>;
   onLoginPress: () => void;
+  onTermsPress: () => void;
   isLoading?: boolean;
   error?: string | null;
 }
 
+// Password strength checking function
+const checkPasswordStrength = (password: string) => {
+  const checks = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    numbers: /\d/.test(password),
+    symbols: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  };
+
+  const passedChecks = Object.values(checks).filter(Boolean).length;
+  let strength = 'weak';
+  let color = '#ff4c4c';
+  let percentage = 0;
+
+  if (passedChecks >= 5) {
+    strength = 'very strong';
+    color = '#4caf50';
+    percentage = 100;
+  } else if (passedChecks >= 4) {
+    strength = 'strong';
+    color = '#8bc34a';
+    percentage = 80;
+  } else if (passedChecks >= 3) {
+    strength = 'moderate';
+    color = '#ffc107';
+    percentage = 60;
+  } else if (passedChecks >= 2) {
+    strength = 'fair';
+    color = '#ff9800';
+    percentage = 40;
+  } else if (passedChecks >= 1) {
+    strength = 'weak';
+    color = '#ff5722';
+    percentage = 20;
+  }
+
+  return { checks, strength, color, percentage, score: passedChecks };
+};
+
 export default function Register({
   onRegister,
   onLoginPress,
+  onTermsPress,
   isLoading = false,
   error = null,
 }: RegisterProps) {
@@ -32,13 +74,37 @@ export default function Register({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [passwordStrength, setPasswordStrength] = useState(null);
+  const [showPasswordStrength, setShowPasswordStrength] = useState(false);
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
 
-  // Get adaptive styles based on current color scheme
   const authStyles = getAuthStyles();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+
+  // Check password strength in real-time
+  useEffect(() => {
+    if (password.length > 0) {
+      const strength = checkPasswordStrength(password);
+      setPasswordStrength(strength);
+      setShowPasswordStrength(true);
+    } else {
+      setShowPasswordStrength(false);
+      setPasswordStrength(null);
+    }
+  }, [password]);
+
+  // Check if passwords match
+  useEffect(() => {
+    if (confirmPassword.length > 0) {
+      setPasswordsMatch(password === confirmPassword);
+    } else {
+      setPasswordsMatch(null);
+    }
+  }, [password, confirmPassword]);
 
   const validateForm = () => {
     if (!name.trim()) {
@@ -53,8 +119,16 @@ export default function Register({
       setLocalError("Password is required");
       return false;
     }
+    if (passwordStrength && passwordStrength.score < 3) {
+      setLocalError("Password is too weak. Please create a stronger password.");
+      return false;
+    }
     if (password !== confirmPassword) {
       setLocalError("Passwords do not match");
+      return false;
+    }
+    if (!acceptedTerms) {
+      setLocalError("You must accept the Terms and Conditions");
       return false;
     }
     setLocalError(null);
@@ -69,6 +143,21 @@ export default function Register({
         // Error is handled by parent component
       }
     }
+  };
+
+  const handleTermsCheckboxPress = () => {
+    setAcceptedTerms(!acceptedTerms);
+  };
+
+  const isFormValid = () => {
+    return name.trim() && 
+           email.trim() && 
+           password.trim() && 
+           confirmPassword.trim() &&
+           passwordStrength && 
+           passwordStrength.score >= 3 &&
+           passwordsMatch &&
+           acceptedTerms;
   };
 
   return (
@@ -91,7 +180,7 @@ export default function Register({
         >
           <View style={authStyles.logoContainer}>
             <Image
-              source={require("../../../assets/images/logo.png")} // Replace with your actual logo path
+              source={require("../../../assets/images/logo.png")}
               style={authStyles.logoImage}
               resizeMode="contain"
             />
@@ -160,10 +249,56 @@ export default function Register({
                   editable={!isLoading}
                   onFocus={() => setFocusedInput('password')}
                   onBlur={() => setFocusedInput(null)}
-                  // These props help ensure password dots are visible
                   textContentType="newPassword"
                   autoComplete="password-new"
                 />
+                
+                {/* Password Strength Indicator */}
+                {showPasswordStrength && passwordStrength && (
+                  <View style={styles.passwordStrengthContainer}>
+                    <View style={styles.strengthHeader}>
+                      <Text style={[styles.strengthText, { color: isDark ? '#e0e0e0' : '#333' }]}>
+                        Password Strength: 
+                      </Text>
+                      <Text style={[styles.strengthLevel, { color: passwordStrength.color }]}>
+                        {passwordStrength.strength}
+                      </Text>
+                    </View>
+                    
+                    <View style={[styles.strengthBar, { backgroundColor: isDark ? '#404040' : '#e0e0e0' }]}>
+                      <View 
+                        style={[
+                          styles.strengthBarFill, 
+                          { 
+                            width: `${passwordStrength.percentage}%`,
+                            backgroundColor: passwordStrength.color 
+                          }
+                        ]} 
+                      />
+                    </View>
+                    
+                    <View style={styles.requirementsContainer}>
+                      <Text style={[styles.requirementsTitle, { color: isDark ? '#e0e0e0' : '#333' }]}>
+                        Requirements:
+                      </Text>
+                      <Text style={[styles.requirement, { color: passwordStrength.checks.length ? '#4caf50' : (isDark ? '#888' : '#999') }]}>
+                        {passwordStrength.checks.length ? '✓' : '○'} At least 8 characters
+                      </Text>
+                      <Text style={[styles.requirement, { color: passwordStrength.checks.uppercase ? '#4caf50' : (isDark ? '#888' : '#999') }]}>
+                        {passwordStrength.checks.uppercase ? '✓' : '○'} One uppercase letter
+                      </Text>
+                      <Text style={[styles.requirement, { color: passwordStrength.checks.lowercase ? '#4caf50' : (isDark ? '#888' : '#999') }]}>
+                        {passwordStrength.checks.lowercase ? '✓' : '○'} One lowercase letter
+                      </Text>
+                      <Text style={[styles.requirement, { color: passwordStrength.checks.numbers ? '#4caf50' : (isDark ? '#888' : '#999') }]}>
+                        {passwordStrength.checks.numbers ? '✓' : '○'} One number
+                      </Text>
+                      <Text style={[styles.requirement, { color: passwordStrength.checks.symbols ? '#4caf50' : (isDark ? '#888' : '#999') }]}>
+                        {passwordStrength.checks.symbols ? '✓' : '○'} One special character
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
 
               <View style={authStyles.inputContainer}>
@@ -171,7 +306,9 @@ export default function Register({
                 <TextInput
                   style={[
                     authStyles.input,
-                    focusedInput === 'confirmPassword' && authStyles.inputFocused
+                    focusedInput === 'confirmPassword' && authStyles.inputFocused,
+                    passwordsMatch === false && styles.inputError,
+                    passwordsMatch === true && styles.inputSuccess
                   ]}
                   placeholder="Confirm your password"
                   placeholderTextColor={isDark ? "#888" : "#999"}
@@ -181,19 +318,71 @@ export default function Register({
                   editable={!isLoading}
                   onFocus={() => setFocusedInput('confirmPassword')}
                   onBlur={() => setFocusedInput(null)}
-                  // These props help ensure password dots are visible
                   textContentType="newPassword"
                   autoComplete="password-new"
                 />
+                
+                {/* Password Match Indicator */}
+                {passwordsMatch !== null && (
+                  <View style={styles.passwordMatchContainer}>
+                    <Text style={[
+                      styles.matchText,
+                      { color: passwordsMatch ? '#4caf50' : '#ff4c4c' }
+                    ]}>
+                      {passwordsMatch ? '✓ Passwords match' : '✗ Passwords do not match'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Terms and Conditions Checkbox */}
+              <View style={[
+                styles.termsContainer,
+                { borderColor: isDark ? '#333333' : '#e0e0e0' }
+              ]}>
+                <TouchableOpacity
+                  style={styles.checkboxContainer}
+                  onPress={handleTermsCheckboxPress}
+                  disabled={isLoading}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    { 
+                      borderColor: isDark ? '#555555' : '#cccccc',
+                      backgroundColor: acceptedTerms ? '#007AFF' : (isDark ? '#2a2a2a' : '#ffffff')
+                    }
+                  ]}>
+                    {acceptedTerms && (
+                      <Text style={styles.checkmark}>✓</Text>
+                    )}
+                  </View>
+                  <View style={styles.termsTextContainer}>
+                    <Text style={[
+                      styles.termsText,
+                      { color: isDark ? '#cccccc' : '#666666' }
+                    ]}>
+                      I agree to the{' '}
+                      <Text 
+                        style={[
+                          styles.termsLink,
+                          { color: '#007AFF' }
+                        ]}
+                        onPress={onTermsPress}
+                      >
+                        Terms and Conditions
+                      </Text>
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
                 style={[
                   authStyles.button,
-                  isLoading && authStyles.buttonDisabled
+                  (!isFormValid() || isLoading) && authStyles.buttonDisabled
                 ]}
                 onPress={handleRegister}
-                disabled={isLoading}
+                disabled={!isFormValid() || isLoading}
               >
                 {isLoading ? (
                   <ActivityIndicator color="white" size="small" />
@@ -221,3 +410,110 @@ export default function Register({
     </SafeAreaView>
   );
 }
+
+const styles = {
+  termsContainer: {
+    marginBottom: 20,
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderRadius: 4,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkmark: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  termsTextContainer: {
+    flex: 1,
+  },
+  termsText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  termsLink: {
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  // Password Strength Styles
+  passwordStrengthContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: 'rgba(94, 53, 177, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(94, 53, 177, 0.1)',
+  },
+  strengthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  strengthText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  strengthLevel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 4,
+    textTransform: 'uppercase',
+  },
+  strengthBar: {
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  strengthBarFill: {
+    height: '100%',
+    borderRadius: 2,
+    transition: 'width 0.3s ease',
+  },
+  requirementsContainer: {
+    marginTop: 4,
+  },
+  requirementsTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  requirement: {
+    fontSize: 11,
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  // Password Match Styles
+  passwordMatchContainer: {
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  matchText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Input State Styles
+  inputError: {
+    borderColor: '#ff4c4c',
+    borderWidth: 1.5,
+  },
+  inputSuccess: {
+    borderColor: '#4caf50',
+    borderWidth: 1.5,
+  },
+};
