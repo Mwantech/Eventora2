@@ -1,0 +1,192 @@
+// Enhanced client-side file validation
+const validateFileType = (uri: string): boolean => {
+  const extension = uri.split('.').pop()?.toLowerCase();
+  const allowedExtensions = [
+    // Images
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif',
+    // Videos
+    'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'm4v', '3gp'
+  ];
+  
+  return extension ? allowedExtensions.includes(extension) : false;
+};
+
+const validateFileSize = async (uri: string, type: 'image' | 'video'): Promise<boolean> => {
+  try {
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    
+    if (!fileInfo.size) {
+      throw new Error('Unable to determine file size');
+    }
+    
+    const maxSize = type === 'image' ? 10 * 1024 * 1024 : 50 * 1024 * 1024; // 10MB for images, 50MB for videos
+    
+    if (fileInfo.size > maxSize) {
+      throw new Error(`File too large. Maximum size: ${maxSize / 1024 / 1024}MB`);
+    }
+    
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
+const validateFileName = (filename: string): boolean => {
+  // Prevent path traversal attacks
+  const dangerousPatterns = [
+    '../', '..\\', './', '.\\', 
+    '%2e%2e%2f', '%2e%2e%5c',
+    'CON', 'PRN', 'AUX', 'NUL'
+  ];
+  
+  const upperFilename = filename.toUpperCase();
+  
+  return !dangerousPatterns.some(pattern => 
+    upperFilename.includes(pattern.toUpperCase())
+  );
+};
+
+// Enhanced upload function with security checks
+export const uploadMediaSecure = async (
+  eventId: string,
+  mediaUris: string[],
+  caption?: string,
+  tags?: string[],
+  onProgress?: (progress: number) => void
+): Promise<MediaItem[]> => {
+  try {
+    if (!mediaUris || mediaUris.length === 0) {
+      throw new Error('No media files provided for upload');
+    }
+
+    if (mediaUris.length > 10) {
+      throw new Error('Maximum 10 files can be uploaded at once');
+    }
+
+    // Validate each file before upload
+    const validatedFiles = [];
+    
+    for (let i = 0; i < mediaUris.length; i++) {
+      const uri = mediaUris[i];
+      const filename = uri.split('/').pop() || '';
+      
+      // Validate file type
+      if (!validateFileType(uri)) {
+        throw new Error(`File ${i + 1}: Invalid file type`);
+      }
+      
+      // Validate filename for security
+      if (!validateFileName(filename)) {
+        throw new Error(`File ${i + 1}: Invalid filename`);
+      }
+      
+      const mediaType = getMediaType(uri);
+      
+      // Validate file size
+      await validateFileSize(uri, mediaType);
+      
+      // Additional image-specific validation
+      if (mediaType === 'image') {
+        const preparedUri = await prepareImageForUpload(uri);
+        validatedFiles.push({ uri: preparedUri, mediaType, originalUri: uri });
+      } else {
+        const preparedUri = await prepareVideoForUpload(uri);
+        validatedFiles.push({ uri: preparedUri, mediaType, originalUri: uri });
+      }
+    }
+    
+    // Proceed with upload using validated files
+    const formData = new FormData();
+    
+    for (let i = 0; i < validatedFiles.length; i++) {
+      const { uri, mediaType } = validatedFiles[i];
+      const filename = uri.split('/').pop() || `${mediaType}-${Date.now()}-${i}`;
+      
+      // Sanitize filename
+      const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+      
+      const file = {
+        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+        name: sanitizedFilename,
+        type: getSecureMimeType(uri, mediaType)
+      };
+      
+      formData.append('files', file as any);
+    }
+    
+    // Add metadata with validation
+    if (caption && caption.trim()) {
+      const sanitizedCaption = caption.trim().substring(0, 500); // Limit caption length
+      formData.append('caption', sanitizedCaption);
+    }
+    
+    if (tags && tags.length > 0) {
+      // Validate and sanitize tags
+      const validTags = tags
+        .filter(tag => tag && tag.trim().length > 0)
+        .map(tag => tag.trim().replace(/[^a-zA-Z0-9\s]/g, '')) // Remove special characters
+        .filter(tag => tag.length > 0)
+        .slice(0, 10); // Limit to 10 tags
+      
+      if (validTags.length > 0) {
+        formData.append('tags', validTags.join(','));
+      }
+    }
+    
+    const response = await apiClient.post(
+      `/events/${eventId}/media`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          // Add security headers
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-Upload-Source': 'mobile-app'
+        },
+        timeout: 300000,
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(progress);
+          }
+        }
+      }
+    );
+    
+    return response.data.data;
+    
+  } catch (error) {
+    console.error('Secure upload error:', error);
+    throw error;
+  }
+};
+
+// Get secure MIME type
+const getSecureMimeType = (uri: string, mediaType: 'image' | 'video'): string => {
+  const extension = uri.split('.').pop()?.toLowerCase();
+  
+  const secureMimeTypes: { [key: string]: string } = {
+    // Images
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'bmp': 'image/bmp',
+    'heic': 'image/heic',
+    'heif': 'image/heif',
+    // Videos
+    'mp4': 'video/mp4',
+    'mov': 'video/quicktime',
+    'avi': 'video/x-msvideo',
+    'mkv': 'video/x-matroska',
+    'wmv': 'video/x-ms-wmv',
+    'flv': 'video/x-flv',
+    'webm': 'video/webm',
+    'm4v': 'video/x-m4v',
+    '3gp': 'video/3gpp'
+  };
+  
+  return secureMimeTypes[extension || ''] || 
+         (mediaType === 'image' ? 'image/jpeg' : 'video/mp4');
+};
