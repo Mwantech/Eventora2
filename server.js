@@ -18,11 +18,24 @@ const eventRoutes = require('./routes/eventRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const inviationRoutes = require('./routes/invitationRoutes');
-const feedbackRoutes = require('./routes/feedbackRoutes'); // Import feedback routes
-const notificationRoutes = require('./routes/notificationRoutes'); // Import notification routes
+const feedbackRoutes = require('./routes/feedbackRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 // Initialize app
 const app = express();
+
+// ===========================================
+// TRUST PROXY CONFIGURATION (IMPORTANT FOR PRODUCTION)
+// ===========================================
+
+// Enable trust proxy for production deployments (Render, Heroku, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // Trust first proxy (required for rate limiting behind reverse proxy)
+  console.log('✅ Trust proxy enabled for production');
+} else {
+  app.set('trust proxy', false);
+  console.log('ℹ️  Trust proxy disabled for development');
+}
 
 // ===========================================
 // DATABASE CONNECTION
@@ -51,13 +64,18 @@ app.use(helmet({
 // General rate limiting for all routes
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // limit each IP to 100 requests per windowMs
+  max: 200, // limit each IP to 200 requests per windowMs
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.'
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip successful requests for some routes
+  skip: (req, res) => {
+    // Don't count health check endpoints against rate limit
+    return req.path === '/ping' || req.path === '/api/health' || req.path === '/api/status';
+  }
 });
 
 // Apply general rate limiting to all requests
@@ -213,23 +231,18 @@ app.get('/', (req, res) => {
 });
 
 // ===========================================
-// JWT AUTHENTICATION MIDDLEWARE
-// ===========================================
-
-
-// ===========================================
 // ROUTES
 // ===========================================
 
-// Auth routes (auth limiter is now applied within the route file)
+// Auth routes
 app.use('/api/auth', authRoutes);
 
-// Protected routes (authentication required)
+// Protected routes
 app.use('/api/events', eventRoutes);
 app.use('/api/invitations', inviationRoutes);
 app.use('/api/analytics', analyticsRoutes);
-app.use('/api/feedback', feedbackRoutes); // Feedback routes with auth
-app.use('/api/notifications', notificationRoutes); // Notification routes with auth
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api', mediaRoutes);
 
 // ===========================================
@@ -285,10 +298,10 @@ const gracefulShutdown = async () => {
     });
   }
   
-  // Close MongoDB connection (updated for newer Mongoose versions)
+  // Close MongoDB connection
   try {
     console.log('Closing MongoDB connection...');
-    await mongoose.connection.close(); // Remove callback, use async/await
+    await mongoose.connection.close();
     console.log('MongoDB connection closed successfully');
   } catch (error) {
     console.error('Error closing MongoDB connection:', error.message);
@@ -332,41 +345,166 @@ const server = app.listen(PORT, () => {
   
   // Initialize keep-alive service after server is fully running
   setTimeout(() => {
-    try {
-      console.log('🔍 Initializing keep-alive service...');
-      
-      // Import and initialize the keep-alive service
-      const aliveService = require('./alive');
-      
-      if (typeof aliveService.initialize === 'function') {
-        aliveService.initialize(app, server);
-        console.log('✅ Keep-alive service initialized successfully');
-      } else {
-        console.error('❌ initialize function not found in alive service');
-      }
-    } catch (error) {
-      console.error('❌ Failed to initialize keep-alive service:', error.message);
-      
-      // Try alternative import paths
-      const alternativeFiles = ['./alive.js', './keep-alive.js'];
-      
-      for (const fileName of alternativeFiles) {
-        try {
-          console.log(`🔍 Trying alternative file: ${fileName}`);
-          const altService = require(fileName);
-          
-          if (typeof altService.initialize === 'function') {
-            altService.initialize(app, server);
-            console.log(`✅ Keep-alive service initialized from ${fileName}`);
-            break;
-          }
-        } catch (altError) {
-          console.log(`❌ ${fileName} not found:`, altError.message);
-        }
-      }
-    }
+    initializeKeepAliveService();
   }, 5000); // Wait 5 seconds for server to fully start
 });
+
+// ===========================================
+// KEEP-ALIVE SERVICE INITIALIZATION
+// ===========================================
+
+function initializeKeepAliveService() {
+  console.log('🔍 Initializing keep-alive service...');
+  
+  // Try Method 1: alive.js with initialize function
+  try {
+    console.log('🔍 Trying alive.js service...');
+    const aliveService = require('./alive');
+    
+    if (aliveService && typeof aliveService.initialize === 'function') {
+      aliveService.initialize(app, server);
+      console.log('✅ Keep-alive service initialized successfully from alive.js');
+      return;
+    } else {
+      console.log('❌ initialize function not found in alive service');
+      console.log('Available functions:', Object.keys(aliveService || {}));
+    }
+  } catch (error) {
+    console.error('❌ Failed to import alive service:', error.message);
+  }
+  
+  // Try Method 2: keep-alive.js with createKeepAliveService function
+  try {
+    console.log('🔍 Trying keep-alive.js service...');
+    const keepAliveModule = require('./keep-alive');
+    
+    if (keepAliveModule && typeof keepAliveModule.createKeepAliveService === 'function') {
+      // Get the service URL
+      const serviceUrl = process.env.RENDER_EXTERNAL_URL || 
+                        (process.env.RENDER_SERVICE_NAME ? 
+                          `https://${process.env.RENDER_SERVICE_NAME}.onrender.com` : null) ||
+                        `http://localhost:${PORT}`;
+      
+      const keepAliveService = keepAliveModule.createKeepAliveService(`${serviceUrl}/ping`, 14);
+      
+      // Store reference globally for graceful shutdown
+      global.keepAliveService = keepAliveService;
+      
+      // Start the service
+      keepAliveService.start();
+      console.log('✅ Keep-alive service started successfully from keep-alive.js');
+      
+      // Add status endpoint
+      app.get('/api/keep-alive/status', (req, res) => {
+        res.json({
+          success: true,
+          message: 'Keep-alive monitoring endpoint',
+          server: {
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            timestamp: new Date(),
+            environment: process.env.NODE_ENV || 'production'
+          },
+          database: {
+            status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+            name: mongoose.connection.name || 'unknown'
+          },
+          keepAlive: keepAliveService.getStatus()
+        });
+      });
+      
+      // Add control endpoints
+      app.get('/api/keep-alive/start', (req, res) => {
+        try {
+          keepAliveService.start();
+          res.json({ 
+            success: true, 
+            message: 'Keep-alive service started',
+            status: keepAliveService.getStatus()
+          });
+        } catch (error) {
+          res.status(500).json({ 
+            success: false, 
+            message: error.message 
+          });
+        }
+      });
+      
+      app.get('/api/keep-alive/stop', (req, res) => {
+        try {
+          keepAliveService.stop();
+          res.json({ 
+            success: true, 
+            message: 'Keep-alive service stopped',
+            status: keepAliveService.getStatus()
+          });
+        } catch (error) {
+          res.status(500).json({ 
+            success: false, 
+            message: error.message 
+          });
+        }
+      });
+      
+      return;
+    } else {
+      console.log('❌ createKeepAliveService function not found in keep-alive service');
+      console.log('Available functions:', Object.keys(keepAliveModule || {}));
+    }
+  } catch (error) {
+    console.error('❌ Failed to initialize keep-alive service from keep-alive.js:', error.message);
+  }
+  
+  // Try Method 3: Direct class instantiation from keep-alive.js
+  try {
+    console.log('🔍 Trying direct KeepAliveService class...');
+    const keepAliveModule = require('./keep-alive');
+    
+    if (keepAliveModule && keepAliveModule.KeepAliveService) {
+      // Get the service URL
+      const serviceUrl = process.env.RENDER_EXTERNAL_URL || 
+                        (process.env.RENDER_SERVICE_NAME ? 
+                          `https://${process.env.RENDER_SERVICE_NAME}.onrender.com` : null) ||
+                        `http://localhost:${PORT}`;
+      
+      const keepAliveService = new keepAliveModule.KeepAliveService(`${serviceUrl}/ping`, 14);
+      
+      // Store reference globally for graceful shutdown
+      global.keepAliveService = keepAliveService;
+      
+      // Start the service
+      keepAliveService.start();
+      console.log('✅ Keep-alive service started successfully using KeepAliveService class');
+      
+      // Add status endpoint
+      app.get('/api/keep-alive/status', (req, res) => {
+        res.json({
+          success: true,
+          message: 'Keep-alive monitoring endpoint',
+          server: {
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            timestamp: new Date(),
+            environment: process.env.NODE_ENV || 'production'
+          },
+          database: {
+            status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+            name: mongoose.connection.name || 'unknown'
+          },
+          keepAlive: keepAliveService.getStatus()
+        });
+      });
+      
+      return;
+    }
+  } catch (error) {
+    console.error('❌ Failed to initialize KeepAliveService class:', error.message);
+  }
+  
+  console.log('⚠️  Keep-alive service could not be initialized');
+  console.log('ℹ️  Server will continue to run without keep-alive functionality');
+  console.log('💡 Make sure you have node-cron installed: npm install node-cron');
+}
 
 // Handle server errors
 server.on('error', (error) => {
