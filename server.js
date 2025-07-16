@@ -100,6 +100,7 @@ const corsOptions = {
       process.env.CLIENT_URL || 'http://localhost:8081',
       'http://192.168.33.89:8081',
       'https://eventora-app.netlify.app',
+      'https://eventoraapp.vercel.app',
       'http://localhost:8081',
       'http://localhost:5173'
     ];
