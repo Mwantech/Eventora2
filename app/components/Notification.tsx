@@ -12,6 +12,8 @@ import {
   Dimensions,
   LayoutAnimation,
   Platform,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -25,18 +27,23 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  Settings,
+  BellOff,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import {
   getReceivedInvitations,
   acceptInvitation,
   declineInvitation,
   type Invitation,
 } from '../services/invitationService';
+import { useNotification } from '../services/NotificationProvider';
 import { styles } from '../styles/notificationsStyles';
 
 const STORAGE_KEY = '@notifications_cache';
 const EXPANDED_NOTIFICATIONS_KEY = '@expanded_notifications';
+const LAST_NOTIFICATION_CHECK_KEY = '@last_notification_check';
 
 interface NotificationsProps {
   maxItems?: number;
@@ -56,6 +63,14 @@ export default function NotificationsComponent({
   showHeader = true
 }: NotificationsProps) {
   const router = useRouter();
+  const {
+    isNotificationEnabled,
+    requestPermissions,
+    clearAllNotifications,
+    badgeCount,
+    setBadgeCount,
+  } = useNotification();
+
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [cachedInvitations, setCachedInvitations] = useState<Invitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,9 +78,13 @@ export default function NotificationsComponent({
   const [processingInvitations, setProcessingInvitations] = useState<Set<string>>(new Set());
   const [expandedNotifications, setExpandedNotifications] = useState<Set<string>>(new Set());
   const [isOnline, setIsOnline] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [lastNotificationCheck, setLastNotificationCheck] = useState<Date | null>(null);
   
   // Animation refs for each notification
   const animationRefs = useRef<Map<string, Animated.Value>>(new Map());
+  const notificationListener = useRef<any>();
+  const responseListener = useRef<any>();
 
   // Configure layout animation
   useEffect(() => {
@@ -82,7 +101,113 @@ export default function NotificationsComponent({
     loadCachedData();
     loadInvitations();
     loadExpandedState();
+    loadLastNotificationCheck();
+    setupPushNotificationListeners();
+    
+    // Listen for app state changes
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription?.remove();
+      cleanupPushNotificationListeners();
+    };
   }, [userId]);
+
+  // Setup push notification listeners
+  const setupPushNotificationListeners = () => {
+    // Listen for notifications received while app is running
+    notificationListener.current = Notifications.addNotificationReceivedListener(
+      handleNotificationReceived
+    );
+
+    // Listen for user interactions with notifications
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(
+      handleNotificationResponse
+    );
+  };
+
+  // Cleanup push notification listeners
+  const cleanupPushNotificationListeners = () => {
+    if (notificationListener.current) {
+      Notifications.removeNotificationSubscription(notificationListener.current);
+    }
+    if (responseListener.current) {
+      Notifications.removeNotificationSubscription(responseListener.current);
+    }
+  };
+
+  // Handle notification received while app is running
+  const handleNotificationReceived = (notification: Notifications.Notification) => {
+    console.log('Notification received in component:', notification);
+    
+    const data = notification.request.content.data;
+    
+    // If it's an invitation notification, refresh the invitations
+    if (data?.type === 'invitation') {
+      loadInvitations(true);
+      // Update badge count
+      setUnreadCount(prev => prev + 1);
+      setBadgeCount(badgeCount + 1);
+    }
+  };
+
+  // Handle notification response (when user taps notification)
+  const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
+    console.log('Notification response in component:', response);
+    
+    const data = response.notification.request.content.data;
+    
+    // Navigate based on notification type
+    switch (data?.type) {
+      case 'invitation':
+        if (data.invitationId) {
+          // Mark as read and navigate
+          markNotificationAsRead(data.invitationId);
+          router.push('/notifications');
+        }
+        break;
+      case 'media_upload':
+        if (data.eventId) {
+          router.push(`/event/${data.eventId}`);
+        }
+        break;
+    }
+  };
+
+  // Handle app state changes
+  const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+    if (nextAppState === 'active') {
+      // Refresh notifications when app becomes active
+      await loadInvitations(true);
+      // Update last check time
+      const now = new Date();
+      setLastNotificationCheck(now);
+      await AsyncStorage.setItem(LAST_NOTIFICATION_CHECK_KEY, now.toISOString());
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = async (invitationId: string) => {
+    try {
+      // Update local state to mark as read
+      const updatedInvitations = invitations.map(inv => 
+        (inv.id || inv._id) === invitationId 
+          ? { ...inv, isRead: true }
+          : inv
+      );
+      
+      setInvitations(updatedInvitations);
+      setCachedInvitations(updatedInvitations);
+      await saveCachedData(updatedInvitations);
+      
+      // Update unread count
+      const newUnreadCount = updatedInvitations.filter(inv => !inv.isRead).length;
+      setUnreadCount(newUnreadCount);
+      await setBadgeCount(newUnreadCount);
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
 
   // Load cached notifications from AsyncStorage
   const loadCachedData = async () => {
@@ -92,6 +217,10 @@ export default function NotificationsComponent({
         const parsedCache = JSON.parse(cached);
         setCachedInvitations(parsedCache);
         
+        // Calculate unread count
+        const unread = parsedCache.filter((inv: Invitation) => !inv.isRead).length;
+        setUnreadCount(unread);
+        
         // If we have cached data and we're loading, show cached data first
         if (isLoading) {
           setInvitations(parsedCache.slice(0, limit || maxItems));
@@ -99,6 +228,18 @@ export default function NotificationsComponent({
       }
     } catch (error) {
       console.error('Error loading cached notifications:', error);
+    }
+  };
+
+  // Load last notification check time
+  const loadLastNotificationCheck = async () => {
+    try {
+      const lastCheck = await AsyncStorage.getItem(LAST_NOTIFICATION_CHECK_KEY);
+      if (lastCheck) {
+        setLastNotificationCheck(new Date(lastCheck));
+      }
+    } catch (error) {
+      console.error('Error loading last notification check:', error);
     }
   };
 
@@ -161,11 +302,23 @@ export default function NotificationsComponent({
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, limit || maxItems);
 
-      setInvitations(uniqueInvitations);
-      setCachedInvitations(uniqueInvitations);
+      // Mark notifications as read/unread based on last check
+      const processedInvitations = uniqueInvitations.map(inv => {
+        const invitationDate = new Date(inv.createdAt);
+        const isRead = lastNotificationCheck ? invitationDate <= lastNotificationCheck : false;
+        return { ...inv, isRead };
+      });
+
+      setInvitations(processedInvitations);
+      setCachedInvitations(processedInvitations);
+      
+      // Calculate unread count
+      const unread = processedInvitations.filter(inv => !inv.isRead).length;
+      setUnreadCount(unread);
+      await setBadgeCount(unread);
       
       // Save to cache
-      await saveCachedData(uniqueInvitations);
+      await saveCachedData(processedInvitations);
       setIsOnline(true);
       
     } catch (error) {
@@ -188,6 +341,67 @@ export default function NotificationsComponent({
     loadInvitations(true);
   };
 
+  // Handle notification settings
+  const handleNotificationSettings = async () => {
+    if (!isNotificationEnabled) {
+      Alert.alert(
+        'Push Notifications Disabled',
+        'Enable push notifications to receive real-time updates about event invitations and media uploads.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Enable',
+            onPress: async () => {
+              const granted = await requestPermissions();
+              if (!granted) {
+                Alert.alert(
+                  'Permission Required',
+                  'Please enable notifications in your device settings to receive updates.'
+                );
+              }
+            }
+          }
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Notification Settings',
+        'Push notifications are enabled. You can manage notification preferences in your device settings.',
+        [
+          { text: 'OK', style: 'default' },
+          {
+            text: 'Clear All',
+            style: 'destructive',
+            onPress: async () => {
+              await clearAllNotifications();
+              await setBadgeCount(0);
+              setUnreadCount(0);
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllAsRead = async () => {
+    try {
+      const updatedInvitations = invitations.map(inv => ({ ...inv, isRead: true }));
+      setInvitations(updatedInvitations);
+      setCachedInvitations(updatedInvitations);
+      await saveCachedData(updatedInvitations);
+      
+      setUnreadCount(0);
+      await setBadgeCount(0);
+      
+      const now = new Date();
+      setLastNotificationCheck(now);
+      await AsyncStorage.setItem(LAST_NOTIFICATION_CHECK_KEY, now.toISOString());
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
   // Get or create animation value for a notification
   const getAnimationValue = (invitationId: string) => {
     if (!animationRefs.current.has(invitationId)) {
@@ -200,6 +414,11 @@ export default function NotificationsComponent({
   const toggleNotificationExpansion = async (invitationId: string) => {
     const isExpanded = expandedNotifications.has(invitationId);
     const animValue = getAnimationValue(invitationId);
+    
+    // Mark as read when expanded
+    if (!isExpanded) {
+      await markNotificationAsRead(invitationId);
+    }
     
     // Configure layout animation
     LayoutAnimation.configureNext({
@@ -251,13 +470,18 @@ export default function NotificationsComponent({
       // Update local state
       const updatedInvitations = invitations.map(inv => 
         (inv.id || inv._id) === invitationId 
-          ? { ...inv, status: 'accepted', respondedAt: new Date().toISOString() }
+          ? { ...inv, status: 'accepted', respondedAt: new Date().toISOString(), isRead: true }
           : inv
       );
       
       setInvitations(updatedInvitations);
       setCachedInvitations(updatedInvitations);
       await saveCachedData(updatedInvitations);
+
+      // Update unread count
+      const newUnreadCount = updatedInvitations.filter(inv => !inv.isRead).length;
+      setUnreadCount(newUnreadCount);
+      await setBadgeCount(newUnreadCount);
 
       Alert.alert(
         'Invitation Accepted', 
@@ -302,13 +526,18 @@ export default function NotificationsComponent({
               // Update local state
               const updatedInvitations = invitations.map(inv => 
                 (inv.id || inv._id) === invitationId 
-                  ? { ...inv, status: 'declined', respondedAt: new Date().toISOString() }
+                  ? { ...inv, status: 'declined', respondedAt: new Date().toISOString(), isRead: true }
                   : inv
               );
               
               setInvitations(updatedInvitations);
               setCachedInvitations(updatedInvitations);
               await saveCachedData(updatedInvitations);
+
+              // Update unread count
+              const newUnreadCount = updatedInvitations.filter(inv => !inv.isRead).length;
+              setUnreadCount(newUnreadCount);
+              await setBadgeCount(newUnreadCount);
               
               Alert.alert('Invitation Declined', 'You have declined the invitation.');
             } catch (error) {
@@ -368,6 +597,7 @@ export default function NotificationsComponent({
     const isProcessing = processingInvitations.has(invitationId);
     const isPending = invitation.status === 'pending';
     const isExpanded = expandedNotifications.has(invitationId);
+    const isRead = invitation.isRead;
     const animValue = getAnimationValue(invitationId);
 
     return (
@@ -377,22 +607,26 @@ export default function NotificationsComponent({
           style={[
             styles.compactNotificationHeader,
             isPending && styles.pendingNotificationHeader,
-            isExpanded && styles.expandedNotificationHeader
+            isExpanded && styles.expandedNotificationHeader,
+            !isRead && styles.unreadNotificationHeader
           ]}
           onPress={() => toggleNotificationExpansion(invitationId)}
           activeOpacity={0.7}
         >
-          <Image
-            source={{
-              uri: invitation.eventId.coverImage || 
-                   'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=400&q=80'
-            }}
-            style={styles.compactEventImage}
-          />
+          <View style={styles.notificationImageContainer}>
+            <Image
+              source={{
+                uri: invitation.eventId.coverImage || 
+                     'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=400&q=80'
+              }}
+              style={styles.compactEventImage}
+            />
+            {!isRead && <View style={styles.unreadIndicator} />}
+          </View>
 
           <View style={styles.compactNotificationInfo}>
             <View style={styles.compactHeaderRow}>
-              <Text style={styles.compactEventName} numberOfLines={1}>
+              <Text style={[styles.compactEventName, !isRead && styles.unreadEventName]} numberOfLines={1}>
                 {invitation.eventId.name}
               </Text>
               <View style={styles.compactHeaderRight}>
@@ -408,7 +642,7 @@ export default function NotificationsComponent({
             </View>
             
             <View style={styles.compactSecondRow}>
-              <Text style={styles.compactInviterName} numberOfLines={1}>
+              <Text style={[styles.compactInviterName, !isRead && styles.unreadInviterName]} numberOfLines={1}>
                 by {invitation.inviterId.name}
               </Text>
               <Text style={styles.compactTimeText}>{formatTime(invitation.createdAt)}</Text>
@@ -551,7 +785,19 @@ export default function NotificationsComponent({
             <View style={styles.headerLeft}>
               <Bell size={20} color="#1F2937" />
               <Text style={styles.headerTitle}>Notifications</Text>
+              {unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
             </View>
+            <TouchableOpacity onPress={handleNotificationSettings}>
+              {isNotificationEnabled ? (
+                <Bell size={20} color="#8B5CF6" />
+              ) : (
+                <BellOff size={20} color="#6B7280" />
+              )}
+            </TouchableOpacity>
           </View>
         )}
         <View style={styles.loadingContainer}>
@@ -569,26 +815,45 @@ export default function NotificationsComponent({
           <View style={styles.headerLeft}>
             <Bell size={20} color="#1F2937" />
             <Text style={styles.headerTitle}>Notifications</Text>
+            {unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
             {!isOnline && (
               <View style={styles.offlineIndicator}>
                 <Text style={styles.offlineText}>Offline</Text>
               </View>
             )}
           </View>
-          {showViewAll && invitations.length > 0 && (
-            <TouchableOpacity onPress={handleViewAllNotifications}>
-              <Text style={styles.viewAllText}>View All</Text>
+          <View style={styles.headerRight}>
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={markAllAsRead} style={styles.markAllReadButton}>
+                <Text style={styles.markAllReadText}>Mark All Read</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={handleNotificationSettings}>
+              {isNotificationEnabled ? (
+                <Bell size={20} color="#8B5CF6" />
+              ) : (
+                <BellOff size={20} color="#6B7280" />
+              )}
             </TouchableOpacity>
-          )}
+            {showViewAll && invitations.length > 0 && (
+              <TouchableOpacity onPress={handleViewAllNotifications}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
 
       {invitations.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Bell size={48} color="#D1D5DB" />
-          <Text style={styles.emptyTitle}>No Notifications</Text>
-          <Text style={styles.emptySubtitle}>
-            {!isOnline ? 'Connect to internet to load notifications' : 'You don\'t have any notifications at the moment'}
+          <Bell size={48} color="#9CA3AF" />
+          <Text style={styles.emptyTitle}>No notifications yet</Text>
+          <Text style={styles.emptyText}>
+            You'll see event invitations and updates here when they arrive.
           </Text>
         </View>
       ) : (
@@ -599,14 +864,14 @@ export default function NotificationsComponent({
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              colors={['#8B5CF6']}
               tintColor="#8B5CF6"
+              colors={['#8B5CF6']}
             />
           }
         >
-          {invitations.map(renderCompactNotificationItem)}
+          {invitations.map((invitation) => renderCompactNotificationItem(invitation))}
           
-          {showViewAll && !compact && invitations.length >= (limit || maxItems) && (
+          {showViewAll && invitations.length >= maxItems && (
             <TouchableOpacity
               style={styles.viewAllButton}
               onPress={handleViewAllNotifications}
