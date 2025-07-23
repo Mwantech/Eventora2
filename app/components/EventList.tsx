@@ -13,7 +13,7 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Plus, User, Calendar, Users, UserPlus, QrCode, MessageCircle, Send, X, Search } from "lucide-react-native";
+import { Plus, User, Calendar, Users, UserPlus, QrCode, MessageCircle, Send, X, Search, TrendingUp } from "lucide-react-native";
 import EventCard from "./EventCard";
 import { getAllEvents, getEventsByUserId, getAuthState } from "../services/eventService";
 import apiClient from "../utils/apiClient"; // Import your API client
@@ -22,7 +22,7 @@ import { styles } from "../styles/EventListStyles";
 
 interface EventListProps {
   userId?: string;
-  filter?: "all" | "created" | "joined";
+  filter?: "all" | "created" | "joined" | "popular";
   onCreateEvent?: () => void;
 }
 
@@ -35,7 +35,7 @@ export default function EventList({
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<"all" | "created" | "joined">(filter);
+  const [activeFilter, setActiveFilter] = useState<"all" | "created" | "joined" | "popular">(filter);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   
@@ -66,6 +66,37 @@ export default function EventList({
     loadUserData();
   }, []);
 
+  // Function to get popular events (sorted by participant count)
+  const getPopularEvents = useCallback(async () => {
+    try {
+      console.log("Fetching popular events...");
+      
+      // Get all public events
+      const allEvents = await getAllEvents();
+      
+      if (!Array.isArray(allEvents)) {
+        console.error("API did not return an array for popular events:", allEvents);
+        return [];
+      }
+      
+      // Filter for public events only and sort by participant count
+      const popularEvents = allEvents
+        .filter(event => !event.isPrivate) // Only public events
+        .sort((a, b) => {
+          const participantsA = a.participants || 0;
+          const participantsB = b.participants || 0;
+          return participantsB - participantsA; // Sort in descending order
+        })
+        .slice(0, 20); // Limit to top 20 popular events
+      
+      console.log("Popular events found:", popularEvents.length);
+      return popularEvents;
+    } catch (error) {
+      console.error("Error fetching popular events:", error);
+      throw error;
+    }
+  }, []);
+
   // Fetch events function
   const fetchEvents = useCallback(async () => {
     if (!currentUser) {
@@ -84,7 +115,10 @@ export default function EventList({
       // Otherwise, use the current user's ID
       const userIdToUse = userId || currentUser?.id;
       
-      if (userIdToUse && (activeFilter === "created" || activeFilter === "joined")) {
+      if (activeFilter === "popular") {
+        // Fetch popular public events
+        eventsData = await getPopularEvents();
+      } else if (userIdToUse && (activeFilter === "created" || activeFilter === "joined")) {
         // For specific user filters, use the user-specific endpoint
         console.log("Fetching user-specific events for user:", userIdToUse, "with filter:", activeFilter);
         eventsData = await getEventsByUserId(userIdToUse, activeFilter);
@@ -134,7 +168,7 @@ export default function EventList({
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeFilter, currentUser, userId]);
+  }, [activeFilter, currentUser, userId, getPopularEvents]);
 
   // Fetch events when user data is available
   useEffect(() => {
@@ -313,6 +347,7 @@ export default function EventList({
         coverImage={item.coverImage}
         location={item.location}
         isPrivate={item.isPrivate}
+        showPopularityBadge={activeFilter === "popular"} // Show badge for popular events
       />
     );
   };
@@ -333,11 +368,18 @@ export default function EventList({
             📍 {item.location}
           </Text>
         )}
-        {item.date && (
-          <Text style={styles.searchSuggestionDate} numberOfLines={1}>
-            📅 {new Date(item.date).toLocaleDateString()}
-          </Text>
-        )}
+        <View style={styles.searchSuggestionMeta}>
+          {item.date && (
+            <Text style={styles.searchSuggestionDate} numberOfLines={1}>
+              📅 {new Date(item.date).toLocaleDateString()}
+            </Text>
+          )}
+          {item.participants && item.participants > 0 && (
+            <Text style={styles.searchSuggestionParticipants} numberOfLines={1}>
+              👥 {item.participants} attending
+            </Text>
+          )}
+        </View>
       </View>
       <View style={styles.searchSuggestionArrow}>
         <Text style={styles.searchSuggestionArrowText}>→</Text>
@@ -350,22 +392,56 @@ export default function EventList({
     return (item && (item.id || item._id)) ? (item.id || item._id).toString() : `fallback-key-${index}`;
   };
 
+  // Get filter display text and description
+  const getFilterInfo = () => {
+    switch (activeFilter) {
+      case "popular":
+        return {
+          title: "Popular Events",
+          subtitle: "Most attended public events",
+          emptyMessage: "No popular events found. Popular events will appear here as more people join public events.",
+        };
+      case "created":
+        return {
+          title: "Created Events",
+          subtitle: "Events you've created",
+          emptyMessage: "You haven't created any events yet. Create your first event to get started!",
+        };
+      case "joined":
+        return {
+          title: "Joined Events",
+          subtitle: "Events you're attending",
+          emptyMessage: "You haven't joined any events yet. Browse popular events or search for events to join!",
+        };
+      default:
+        return {
+          title: "All Events",
+          subtitle: "Discover amazing events",
+          emptyMessage: "No events available. Create your first event or check back later!",
+        };
+    }
+  };
+
+  const filterInfo = getFilterInfo();
+
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
-        <Calendar size={32} color="#9333ea" />
+        {activeFilter === "popular" ? (
+          <TrendingUp size={32} color="#9333ea" />
+        ) : (
+          <Calendar size={32} color="#9333ea" />
+        )}
       </View>
       <Text style={styles.emptyTitle}>
-        {error ? "Something went wrong" : searchQuery ? "No matching events" : "No events yet"}
+        {error ? "Something went wrong" : searchQuery ? "No matching events" : filterInfo.title}
       </Text>
       <Text style={styles.emptySubtitle}>
         {error 
           ? "We couldn't load your events. Please try again." 
           : searchQuery
             ? `No events found matching "${searchQuery}". Try a different search term.`
-            : activeFilter === "all" 
-              ? "Create your first event to get started!" 
-              : `No ${activeFilter} events found. Try a different filter or create a new event.`
+            : filterInfo.emptyMessage
         }
       </Text>
       {searchQuery ? (
@@ -375,12 +451,19 @@ export default function EventList({
         >
           <Text style={styles.clearSearchButtonText}>Clear Search</Text>
         </TouchableOpacity>
-      ) : (
+      ) : activeFilter !== "popular" ? (
         <TouchableOpacity
           onPress={handleCreateEvent}
           style={styles.createButton}
         >
           <Text style={styles.createButtonText}>Create Event</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={() => setActiveFilter("all")}
+          style={styles.createButton}
+        >
+          <Text style={styles.createButtonText}>Browse All Events</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -392,8 +475,8 @@ export default function EventList({
       <View style={styles.headerContainer}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
-            <Text style={styles.appName}>Eventora</Text>
-            <Text style={styles.headerSubtitle}>Discover amazing events</Text>
+            <Text style={styles.appName}>EventiJam</Text>
+            <Text style={styles.headerSubtitle}>{filterInfo.subtitle}</Text>
           </View>
           
           {/* Header Actions */}
@@ -469,7 +552,7 @@ export default function EventList({
         </View>
       )}
 
-      {/* Modern Filter Tabs */}
+      {/* Enhanced Filter Tabs with Popular */}
       <View style={styles.filterContainer}>
         <TouchableOpacity
           onPress={() => setActiveFilter("all")}
@@ -484,8 +567,30 @@ export default function EventList({
               activeFilter === "all" && styles.activeFilterText,
             ]}
           >
-            All Events
+            All
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setActiveFilter("popular")}
+          style={[
+            styles.filterTab,
+            activeFilter === "popular" && styles.activeFilterTab,
+            activeFilter === "popular" && styles.popularFilterTab,
+          ]}
+        >
+          <View style={styles.filterTabContent}>
+            <TrendingUp size={14} color={activeFilter === "popular" ? "#ffffff" : "#f59e0b"} />
+            <Text
+              style={[
+                styles.filterText,
+                activeFilter === "popular" && styles.activeFilterText,
+                activeFilter === "popular" && styles.popularFilterText,
+              ]}
+            >
+              Popular
+            </Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -533,6 +638,15 @@ export default function EventList({
         </View>
       )}
 
+      {/* Popular Events Header Info */}
+      {activeFilter === "popular" && !searchQuery && !isLoading && (
+        <View style={styles.popularEventsHeader}>
+          <Text style={styles.popularEventsHeaderText}>
+            🔥 Trending events with the most attendees
+          </Text>
+        </View>
+      )}
+
       {/* Error Message */}
       {error && (
         <View style={styles.errorContainer}>
@@ -551,7 +665,9 @@ export default function EventList({
         {isLoading && !isRefreshing ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#9333ea" />
-            <Text style={styles.loadingText}>Loading events...</Text>
+            <Text style={styles.loadingText}>
+              {activeFilter === "popular" ? "Finding popular events..." : "Loading events..."}
+            </Text>
           </View>
         ) : (
           <FlatList
