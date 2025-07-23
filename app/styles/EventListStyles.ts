@@ -118,53 +118,55 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
+  
   headerSearchContainer: {
-  marginTop: 16,
-  marginBottom: 16,
-  zIndex: 1, // Ensure search stays above other elements
-},
+    marginTop: 16,
+    marginBottom: 16,
+    zIndex: 1, // Ensure search stays above other elements
+  },
 
-headerSearchInputContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: '#f3f4f6',
-  borderRadius: 14,
-  paddingHorizontal: 16,
-  paddingVertical: 10,
-  borderWidth: 1,
-  borderColor: '#e5e7eb',
-},
+  headerSearchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
 
-headerSearchInputContainerFocused: {
-  backgroundColor: '#ffffff',
-  borderColor: '#8b5cf6',
-  shadowColor: '#8b5cf6',
-  shadowOffset: { width: 0, height: 0 },
-  shadowOpacity: 0.2,
-  shadowRadius: 8,
-  elevation: 2,
-},
+  headerSearchInputContainerFocused: {
+    backgroundColor: '#ffffff',
+    borderColor: '#8b5cf6',
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 2,
+  },
 
-headerSearchIcon: {
-  marginRight: 8,
-},
+  headerSearchIcon: {
+    marginRight: 8,
+  },
 
-headerSearchInput: {
-  flex: 1,
-  fontSize: 16,
-  color: '#1f2937',
-  paddingVertical: Platform.OS === 'ios' ? 8 : 4, // Better cross-platform padding
-  paddingHorizontal: 8,
-  includeFontPadding: false, // Prevent extra padding on Android
-  textAlignVertical: 'center', // Better vertical alignment
-},
+  headerSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1f2937',
+    paddingVertical: Platform.OS === 'ios' ? 8 : 4, // Better cross-platform padding
+    paddingHorizontal: 8,
+    includeFontPadding: false, // Prevent extra padding on Android
+    textAlignVertical: 'center', // Better vertical alignment
+  },
 
-headerSearchClearButton: {
-  padding: 4,
-  borderRadius: 12,
-  backgroundColor: '#e5e7eb',
-  marginLeft: 4, // Add some spacing from the input
-},
+  headerSearchClearButton: {
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: '#e5e7eb',
+    marginLeft: 4, // Add some spacing from the input
+  },
+  
   searchSuggestionsContainer: {
     backgroundColor: '#ffffff',
     marginHorizontal: 24,
@@ -201,7 +203,7 @@ headerSearchClearButton: {
     fontSize: 15,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 3,
+    marginBottom: 4,
   },
 
   searchSuggestionSubtitle: {
@@ -210,9 +212,20 @@ headerSearchClearButton: {
     marginBottom: 2,
   },
 
+  searchSuggestionMeta: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
   searchSuggestionDate: {
     fontSize: 12,
     color: '#9ca3af',
+  },
+
+  searchSuggestionParticipants: {
+    fontSize: 12,
+    color: '#f59e0b',
+    fontWeight: '500',
   },
 
   searchSuggestionArrow: {
@@ -238,6 +251,25 @@ headerSearchClearButton: {
     fontWeight: '500',
   },
 
+  // Popular Events Header
+  popularEventsHeader: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+
+  popularEventsHeaderText: {
+    fontSize: 14,
+    color: '#f59e0b',
+    fontWeight: '600',
+    textAlign: 'center',
+    backgroundColor: '#fef3c7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
   // Clear Search Button
   clearSearchButton: {
     backgroundColor: '#f3f4f6',
@@ -254,7 +286,7 @@ headerSearchClearButton: {
     fontWeight: '600',
   },
   
-  // Filter Tabs Styles - More Modern
+  // Enhanced Filter Tabs Styles with Popular Tab
   filterContainer: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
@@ -275,7 +307,7 @@ headerSearchClearButton: {
   filterTab: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     alignItems: 'center',
     borderRadius: 16,
     marginHorizontal: 2,
@@ -293,9 +325,21 @@ headerSearchClearButton: {
     shadowRadius: 6,
     elevation: 4,
   },
+
+  // Special styling for Popular tab
+  popularFilterTab: {
+    backgroundColor: '#f59e0b',
+    shadowColor: '#f59e0b',
+  },
+
+  filterTabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   
   filterText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#64748b',
     letterSpacing: 0.2,
@@ -304,6 +348,10 @@ headerSearchClearButton: {
   activeFilterText: {
     color: '#ffffff',
     fontWeight: '700',
+  },
+
+  popularFilterText: {
+    fontSize: 12,
   },
   
   // Content Styles
