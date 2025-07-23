@@ -109,7 +109,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted, onLogin }) 
             ]}
           >
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>Eventora</Text>
+              <Text style={styles.logoText}>EventiJam</Text>
               <View style={styles.logoAccent} />
             </View>
           </Animated.View>
