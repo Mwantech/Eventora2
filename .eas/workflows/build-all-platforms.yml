@@ -1,0 +1,32 @@
+# EAS Workflow for Building Android and iOS Apps
+# This workflow will automatically trigger when you push to the 'main' branch
+# You can manually run it with: eas workflow:run build-all-platforms.yml
+
+name: Build Android and iOS
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  # Build Android with production profile
+  # To change the profile parameter, replace 'production' with other build profiles like:
+  # - 'preview' for preview builds
+  # - 'development' for development builds
+  build_android:
+    name: Build Android
+    type: build
+    params:
+      platform: android
+      profile: production
+    
+  # Build iOS with production profile
+  # To change the profile parameter, replace 'production' with other build profiles like:
+  # - 'preview' for preview builds  
+  # - 'development' for development builds
+  build_ios:
+    name: Build iOS
+    type: build
+    params:
+      platform: ios
+      profile: production

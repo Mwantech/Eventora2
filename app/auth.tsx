@@ -4,10 +4,11 @@ import { Stack, useRouter } from "expo-router";
 import Login from "./components/auth/Login";
 import Register from "./components/auth/Register";
 import EmailVerification from "./components/auth/EmailVerification";
+import TermsAndConditions from "./components/auth/TermsAndConditions";
 import WelcomeScreen from "./WelcomeScreen"; // Import the welcome screen
 import { useAuth } from "./services/auth";
 
-type AuthScreenState = 'welcome' | 'login' | 'register' | 'verification';
+type AuthScreenState = 'welcome' | 'login' | 'register' | 'verification' | 'terms';
 
 export default function AuthScreen() {
   const [currentScreen, setCurrentScreen] = useState<AuthScreenState>('welcome');
@@ -96,6 +97,19 @@ export default function AuthScreen() {
     setPendingVerificationEmail('');
   };
 
+  // Terms and Conditions handlers
+  const handleTermsPress = () => {
+    setCurrentScreen('terms');
+  };
+
+  const handleTermsAccept = () => {
+    setCurrentScreen('register');
+  };
+
+  const handleTermsBack = () => {
+    setCurrentScreen('register');
+  };
+
   const renderCurrentScreen = () => {
     switch (currentScreen) {
       case 'welcome':
@@ -121,6 +135,7 @@ export default function AuthScreen() {
           <Register
             onRegister={handleRegisterPress}
             onLoginPress={handleSwitchToLogin}
+            onTermsPress={handleTermsPress}
             isLoading={state.isLoading}
             error={state.error}
           />
@@ -135,6 +150,14 @@ export default function AuthScreen() {
             onBackToRegister={handleBackToRegister}
             isLoading={state.isLoading}
             error={state.error}
+          />
+        );
+      
+      case 'terms':
+        return (
+          <TermsAndConditions
+            onAccept={handleTermsAccept}
+            onBack={handleTermsBack}
           />
         );
       

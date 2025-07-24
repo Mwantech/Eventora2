@@ -81,7 +81,7 @@ export default function Login({
         >
           <View style={authStyles.logoContainer}>
             <Image
-              source={require("../../../assets/images/logo.png")}
+              source={require("../../../assets/images/banner.png")} // Use the correct image path
               style={authStyles.logoImage}
               resizeMode="contain"
             />
@@ -166,7 +166,7 @@ export default function Login({
           </View>
           
           <View style={authStyles.footer}>
-            <Text style={authStyles.footerText}>© 2025 Eventora. All rights reserved.</Text>
+            <Text style={authStyles.footerText}>© 2025 EventiJam. All rights reserved.</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
